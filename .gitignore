@@ -13,6 +13,8 @@ build/
 
 # Registros y temporales
 *.log
+# Respuesta suelta que deja el script de pruebas de la API
+.resp.json
 npm-debug.log*
 .DS_Store
 Thumbs.db

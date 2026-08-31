@@ -9,6 +9,35 @@ enrutada con **React Router DOM 7** y estilizada por completo con **Tailwind CSS
 
 ---
 
+## Aviso de uso académico
+
+Este repositorio es un **trabajo escolar** del programa ADSO del SENA. No es un
+producto comercial, no está en explotación y no se distribuye como tal.
+
+AutoPrime es un concesionario **ficticio**. Los datos de contacto, la dirección,
+las noticias, los testimonios y los precios son inventados para el ejercicio.
+
+El material de terceros que contiene se usa **solo con fines educativos**, sin
+ánimo de lucro y sin relación alguna con sus titulares:
+
+| Material | Origen | Titular |
+|---|---|---|
+| 58 fotografías del catálogo | Galerías oficiales de cada vehículo | **MANSORY Design & Holding GmbH** |
+| 3 vídeos de la portada | TikTok | **@hasneditz**, **@infinity_motors_2.0**, **@espx.x** |
+| Fotografías de detalle y ambiente | [Pexels](https://www.pexels.com) | Licencia libre |
+| Modelos 3D y código | Trabajo propio del autor | — |
+
+Las marcas MANSORY, Ferrari, Bugatti, Rolls-Royce, Porsche, Bentley,
+Lamborghini, Mercedes-AMG y Tesla pertenecen a sus respectivos propietarios y
+aparecen únicamente a título descriptivo. Las marcas de agua de MANSORY se
+conservan intactas en todas las fotografías, precisamente para no ocultar su
+procedencia.
+
+**Si eres titular de alguno de estos materiales y quieres que se retire, abre
+una incidencia en el repositorio y se elimina.**
+
+---
+
 ## Cómo ejecutar
 
 ```bash

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#020204" />
+    <meta
+      name="description"
+      content="AutoPrime, atelier automotriz en Pereira: diez preparaciones MANSORY con peritaje de 120 puntos, garantía de 2 años y cita en línea."
+    />
+    <title>AutoPrime | Atelier automotriz</title>
+    <script>
+      /*
+        Fija el idioma ANTES del primer pintado, para que el atributo `lang`
+        del documento sea correcto desde el arranque. React lo escribe en un
+        efecto, que corre despues de pintar.
+      */
+      (function () {
+        try {
+          var i = localStorage.getItem("autoprime:idioma");
+          if (i === "es" || i === "en") document.documentElement.lang = i;
+        } catch (e) {
+          /* Sin almacenamiento se queda el idioma por defecto del HTML. */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

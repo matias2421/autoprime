@@ -1,0 +1,748 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Inter:wght@300;400;500;600&display=swap');
+@import "tailwindcss";
+
+/* ==========================================================================
+   Design System - AutoPrime
+   Lenguaje visual: atelier automotriz.
+
+   Titulares en serif ligera sobre negro azulado, interfaz en sans de palo
+   seco con mayúsculas y tracking amplio, y un único acento de azul acero.
+
+   Toda la página es oscura: no hay ninguna superficie clara. La jerarquía
+   entre secciones se construye con cuatro tonos de negro muy próximos, con
+   bordes de 1px y con paneles de cristal, nunca invirtiendo a blanco.
+   Esquinas rectas en todo (radius 0).
+
+   Ver design-system/autoprime-concesionario/MASTER.md
+   ========================================================================== */
+@theme {
+  /*
+   * Superficies, de la más honda a la más elevada. No hay ninguna clara: la
+   * jerarquía se construye subiendo el valor unos pocos puntos y apoyándose
+   * en los bordes de 1px y en el cristal, no en invertir a blanco.
+   */
+  --color-negro: #020204;    /* fondo base */
+  --color-carbon: #07070b;   /* secciones alternas */
+  --color-grafito: #0d0d13;  /* tarjetas y campos de formulario */
+  --color-pizarra: #13131b;  /* superficie elevada, cabeceras de tabla */
+  --color-linea: #22222b;    /* separadores */
+  --color-trazo: #3c3c47;    /* bordes de control e iconografía */
+
+  /* --- Texto --- */
+  --color-hueso: #ffffff;
+  --color-ceniza: #b6b6b6;   /* 10.2:1 sobre #020204 */
+  --color-plomo: #8f8f93;    /*  6.4:1 sobre #020204 — mínimo AA */
+
+  /* --- Acento: azul acero --- */
+  --color-accion: #829fb0;        /*  7.4:1 sobre #020204 como texto.
+                                      Como RELLENO exige texto --color-negro
+                                      (7.4:1); en blanco daría 2.8:1. */
+  --color-accion-claro: #a9bdc8;  /* hover cuando el azul es texto */
+
+  /*
+   * Azul de RELLENO. El de texto (#829fb0) es demasiado luminoso para cubrir
+   * superficies en una página que quiere ser toda oscura: como fondo de botón
+   * marcaba 0.33 de luminancia y rompía el conjunto. Este se queda en 0.11,
+   * separa del fondo (3.2:1) y admite texto blanco con 6.6:1.
+   */
+  --color-accion-fondo: #3d6274;
+  --color-accion-hondo: #4d7688;  /* su hover */
+  --color-exito: #10b981;
+
+  /* --- Tipografía --- */
+  --font-display: "Cormorant Garamond", "Times New Roman", Times, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* --- Movimiento --- */
+  --ease-suave: cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-aparecer: aparecer 400ms var(--ease-suave) both;
+  --animate-subir: subir 500ms var(--ease-suave) both;
+}
+
+@keyframes aparecer {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes subir {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    background-color: var(--color-negro);
+  }
+
+  body {
+    background-color: var(--color-negro);
+    color: var(--color-hueso);
+    font-family: var(--font-sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #root {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Ningún elemento redondeado: la identidad es de esquinas rectas. */
+  * {
+    border-radius: 0;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accion);
+    outline-offset: 3px;
+  }
+
+  img, svg, video {
+    max-width: 100%;
+  }
+
+  ::selection {
+    background: var(--color-accion);
+    color: var(--color-negro);
+  }
+}
+
+@layer components {
+  /*
+   * Titular de display: serif ligera, caja alta y baja (no versalitas) e
+   * interlineado ceñido. Pensado solo para cuerpos grandes (≥ 2rem); por
+   * debajo de ese tamaño la serif ligera pierde legibilidad y se usa la sans.
+   */
+  .display {
+    font-family: var(--font-display);
+    font-weight: 300;
+    line-height: 1.02;
+    letter-spacing: -0.005em;
+  }
+
+  /* Variante en mayúsculas para el nombre de la marca y los rótulos grandes. */
+  .display-alta {
+    font-family: var(--font-display);
+    font-weight: 300;
+    text-transform: uppercase;
+    line-height: 1.02;
+    letter-spacing: 0.02em;
+  }
+
+  /* Etiqueta pequeña con tracking amplio (categorías, kickers, fechas). */
+  .etiqueta {
+    font-family: var(--font-sans);
+    text-transform: uppercase;
+    font-weight: 500;
+    font-size: 0.6875rem;
+    letter-spacing: 0.14em;
+  }
+
+  /* Degradado que asegura legibilidad del texto sobre las fotos. */
+  .velo {
+    background: linear-gradient(
+      to top,
+      rgb(2 2 4 / 0.92) 0%,
+      rgb(2 2 4 / 0.65) 35%,
+      rgb(2 2 4 / 0.15) 65%,
+      rgb(2 2 4 / 0.35) 100%
+    );
+  }
+
+  /*
+   * Motivo de líneas diagonales de la identidad. Se superpone a las fotos
+   * con mezcla "lighten" para que solo aclare, nunca ensucie la imagen.
+   */
+  .lineas-kv {
+    pointer-events: none;
+    mix-blend-mode: lighten;
+    opacity: 0.5;
+  }
+}
+
+/* ==========================================================================
+   Cortina de entrada
+   El nombre suelta el tracking mientras las dos marcas de líneas salen de
+   detrás de él hacia los lados. Todo cuelga de una línea de tiempo de 2,1 s.
+   ========================================================================== */
+
+.pre-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background-color: var(--color-negro);
+  transition: opacity 620ms var(--ease-suave), transform 620ms var(--ease-suave);
+}
+
+.pre-saliendo {
+  opacity: 0;
+  transform: translateY(-1.5%);
+  pointer-events: none;
+}
+
+/*
+ * El nombre. Arranca con el tracking muy abierto y lo cierra hasta su medida
+ * de reposo: la palabra parece asentarse en lugar de aparecer de golpe.
+ * Las versalitas dejan la "A" y la "P" a caja alta y el resto en capitales
+ * pequeñas, que es el ritmo del logotipo.
+ */
+.pre-nombre {
+  font-variant-caps: small-caps;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  animation: pre-asentar 1000ms var(--ease-suave) 160ms both;
+}
+
+/*
+ * Las marcas nacen ocultas detrás del nombre y se abren hacia fuera. El
+ * desplazamiento inicial es hacia el centro, por eso la izquierda entra
+ * desde la derecha y la derecha desde la izquierda.
+ */
+.pre-marca {
+  opacity: 0;
+}
+
+.pre-marca-izq {
+  margin-right: 0.85rem;
+  animation: pre-abrir-izq 820ms var(--ease-suave) 620ms both;
+}
+
+.pre-marca-der {
+  margin-left: 0.85rem;
+  animation: pre-abrir-der 820ms var(--ease-suave) 620ms both;
+}
+
+.pre-lineas {
+  opacity: 0;
+  animation: pre-entrar-lineas 900ms var(--ease-suave) 900ms both;
+}
+
+.pre-barra {
+  transform: scaleX(0);
+  animation: pre-barrer 620ms var(--ease-suave) 1400ms both;
+}
+
+.pre-pie {
+  opacity: 0;
+  animation: pre-entrar-pie 620ms var(--ease-suave) 1580ms both;
+}
+
+@keyframes pre-asentar {
+  from { opacity: 0; letter-spacing: 0.42em; filter: blur(5px); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; letter-spacing: 0.06em; filter: blur(0); }
+}
+
+@keyframes pre-abrir-izq {
+  from { opacity: 0; transform: translateX(2.2rem) scaleX(0.35); }
+  to   { opacity: 1; transform: translateX(0) scaleX(1); }
+}
+
+@keyframes pre-abrir-der {
+  from { opacity: 0; transform: translateX(-2.2rem) scaleX(0.35); }
+  to   { opacity: 1; transform: translateX(0) scaleX(1); }
+}
+
+@keyframes pre-entrar-lineas {
+  from { opacity: 0; transform: translateX(-6%); }
+  to   { opacity: 0.45; transform: translateX(0); }
+}
+
+@keyframes pre-barrer {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+@keyframes pre-entrar-pie {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+
+/* ==========================================================================
+   Las clases de abajo van dentro de `@layer components` A PROPÓSITO.
+
+   Sin capa, ganarían a las utilidades de Tailwind, que viven en
+   `@layer utilities`: `position: relative` de `.cristal` anulaba el `fixed`
+   de un botón flotante y el `absolute` de un panel superpuesto, y ambos
+   volvían al flujo normal rompiendo la maqueta. Dentro de la capa de
+   componentes, cualquier utilidad puesta en el marcado manda sobre ellas,
+   que es el orden correcto.
+   ========================================================================== */
+
+@layer components {
+
+  /* ==========================================================================
+     Resplandores de ambiente
+
+     El cristal sobre negro plano no refracta nada: se ve como un gris liso. Lo
+     que le da vida es que haya algo detrás. Estos resplandores son manchas
+     radiales muy tenues del azul de acento que se colocan al fondo de una
+     sección para que los paneles tengan qué difuminar.
+     ========================================================================== */
+
+  .resplandor {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .resplandor::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        62% 48% at 12% 0%,
+        color-mix(in oklab, var(--color-accion) 16%, transparent) 0%,
+        transparent 68%
+      ),
+      radial-gradient(
+        52% 56% at 92% 96%,
+        color-mix(in oklab, var(--color-accion) 11%, transparent) 0%,
+        transparent 70%
+      );
+  }
+
+  /* Variante centrada, para secciones que llevan el contenido al medio. */
+  .resplandor-centro::before {
+    background: radial-gradient(
+      58% 62% at 50% 42%,
+      color-mix(in oklab, var(--color-accion) 14%, transparent) 0%,
+      transparent 72%
+    );
+  }
+
+  /* ==========================================================================
+     Liquid glass
+
+     Superficie translúcida con desenfoque del fondo, realce especular en el
+     borde superior y sombra de contacto. La escala va de `sutil` (grandes
+     extensiones) a `denso` (encima de fotografía a todo color).
+     ========================================================================== */
+
+  .cristal,
+  .cristal-sutil,
+  .cristal-denso {
+    position: relative;
+    border: 1px solid color-mix(in oklab, var(--color-hueso) 12%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklab, var(--color-hueso) 15%, transparent),
+      inset 0 -1px 0 color-mix(in oklab, var(--color-negro) 45%, transparent),
+      0 24px 60px -28px rgb(0 0 0 / 0.8);
+  }
+
+  .cristal {
+    background: color-mix(in oklab, var(--color-pizarra) 55%, transparent);
+    backdrop-filter: blur(22px) saturate(170%);
+    -webkit-backdrop-filter: blur(22px) saturate(170%);
+  }
+
+  /* Para extensiones grandes: apenas se despega del fondo. */
+  .cristal-sutil {
+    background: color-mix(in oklab, var(--color-grafito) 42%, transparent);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklab, var(--color-hueso) 9%, transparent),
+      0 18px 44px -30px rgb(0 0 0 / 0.7);
+  }
+
+  /* Encima de fotografía a todo color hace falta más cuerpo. */
+  .cristal-denso {
+    background: color-mix(in oklab, var(--color-negro) 72%, transparent);
+    backdrop-filter: blur(30px) saturate(185%);
+    -webkit-backdrop-filter: blur(30px) saturate(185%);
+  }
+
+  /*
+   * Realce especular: una banda diagonal muy tenue que cruza la superficie y
+   * concentra la luz en la esquina superior izquierda.
+   */
+  .cristal::before,
+  .cristal-sutil::before,
+  .cristal-denso::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      118deg,
+      color-mix(in oklab, var(--color-hueso) 13%, transparent) 0%,
+      transparent 34%,
+      transparent 66%,
+      color-mix(in oklab, var(--color-hueso) 6%, transparent) 100%
+    );
+  }
+
+  /*
+   * Estado activo: el borde y el realce se tiñen del acento. Se aplica al pasar
+   * el puntero o al enfocar con el teclado, nunca solo con hover.
+   */
+  .cristal-vivo {
+    transition: border-color 260ms var(--ease-suave), box-shadow 260ms var(--ease-suave);
+  }
+
+  .cristal-vivo:hover,
+  .cristal-vivo:focus-within {
+    border-color: color-mix(in oklab, var(--color-accion) 55%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklab, var(--color-accion) 34%, transparent),
+      inset 0 -1px 0 color-mix(in oklab, var(--color-negro) 45%, transparent),
+      0 0 0 1px color-mix(in oklab, var(--color-accion) 18%, transparent),
+      0 28px 70px -30px color-mix(in oklab, var(--color-accion) 40%, transparent);
+  }
+
+  /*
+   * Sin soporte de `backdrop-filter` las superficies se vuelven opacas. La
+   * diferencia es entre un cristal y un panel liso, no entre legible e
+   * ilegible: el contraste del texto no depende del desenfoque.
+   */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .cristal { background: var(--color-pizarra); }
+    .cristal-sutil { background: var(--color-grafito); }
+    .cristal-denso { background: color-mix(in oklab, var(--color-negro) 92%, transparent); }
+  }
+
+  /* ==========================================================================
+     Cursor de lente
+
+     Una bola de cristal que se rezaga tras el ratón y distorsiona el fondo
+     real de la página, más un punto que sí va exacto para no perder
+     precisión al apuntar.
+     ========================================================================== */
+
+  .lente-filtro {
+    position: absolute;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+  }
+
+  /*
+   * El anclaje solo se ocupa de la POSICIÓN: es lo que mueve el JS en cada
+   * fotograma. El tamaño lo cambia la lente de dentro con `scale`, de modo
+   * que crecer o encogerse no toca la maqueta —solo la GPU—, que es lo que
+   * hace falta en algo que persigue al puntero a 60 fps.
+   */
+  .lente-ancla,
+  .lente-punto {
+    position: fixed;
+    top: 0;
+    left: 0;
+    /*
+     * Por encima de todo, incluida la cortina de entrada (z-index 100). Con
+     * el cursor del sistema oculto, quedar por debajo de algo dejaría al
+     * visitante sin ningún puntero a la vista justo cuando la cortina se
+     * puede saltar con un clic.
+     */
+    z-index: 110;
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  .lente {
+    /* Caja fija; lo que varía es la escala. 68 px es el tamaño máximo. */
+    position: absolute;
+    top: -34px;
+    left: -34px;
+    width: 68px;
+    height: 68px;
+    /* El reset global deja todo a esquina viva; aquí hace falta un círculo. */
+    border-radius: 50%;
+    transform: scale(0.44);
+
+    /*
+     * La distorsión. El desenfoque más la saturación y el brillo bastan para
+     * que se lea como vidrio en cualquier navegador con `backdrop-filter`.
+     */
+    backdrop-filter: blur(2px) saturate(190%) brightness(1.22) contrast(1.06);
+    -webkit-backdrop-filter: blur(2px) saturate(190%) brightness(1.22) contrast(1.06);
+
+    /* Reflejo especular arriba a la izquierda, como en una gota. */
+    background: radial-gradient(
+      circle at 32% 28%,
+      rgb(255 255 255 / 0.4) 0%,
+      rgb(255 255 255 / 0.08) 40%,
+      transparent 62%
+    );
+
+    border: 1px solid rgb(255 255 255 / 0.38);
+
+    /*
+     * Menisco y aberración cromática: dos anillos muy finos desplazados en
+     * sentidos opuestos, uno frío y otro cálido, que es lo que hace que el
+     * borde parezca vidrio y no un círculo pintado.
+     */
+    box-shadow:
+      inset 0 1px 2px rgb(255 255 255 / 0.5),
+      inset 0 -2px 4px rgb(0 0 0 / 0.35),
+      -1px 0 3px -1px color-mix(in oklab, var(--color-accion) 70%, transparent),
+      1px 0 3px -1px rgb(255 190 140 / 0.5),
+      0 6px 20px -6px rgb(0 0 0 / 0.55);
+
+    transition:
+      transform 340ms var(--ease-suave),
+      opacity 220ms ease,
+      border-color 340ms var(--ease-suave);
+  }
+
+  /*
+   * Refracción de verdad donde el navegador admite filtros SVG en
+   * `backdrop-filter`: el mapa de desplazamiento curva la imagen del fondo en
+   * lugar de solo desenfocarla. Hoy es cosa de Chromium; el resto se queda
+   * con la versión de arriba, que ya se lee como cristal.
+   */
+  @supports (backdrop-filter: url("#lente-refraccion")) {
+    .lente {
+      backdrop-filter: url("#lente-refraccion") blur(1.5px) saturate(190%) brightness(1.2);
+      -webkit-backdrop-filter: url("#lente-refraccion") blur(1.5px) saturate(190%) brightness(1.2);
+    }
+  }
+
+  /* Sobre algo pulsable la bola crece hasta su tamaño completo. */
+  .lente-activa {
+    transform: scale(1);
+    border-color: color-mix(in oklab, var(--color-accion) 75%, transparent);
+  }
+
+  /* Al presionar se contrae, como si cediera. */
+  .lente-pulsada {
+    transform: scale(0.32);
+  }
+
+  .lente-oculta {
+    opacity: 0;
+  }
+
+  .lente-punto {
+    width: 5px;
+    height: 5px;
+    margin-top: -2.5px;
+    margin-left: -2.5px;
+    border-radius: 50%;
+    background: var(--color-hueso);
+    mix-blend-mode: difference;
+    transition: opacity 220ms ease;
+  }
+
+  /* Con la lente puesta se retira el cursor del sistema. */
+  html.con-lente,
+  html.con-lente * {
+    cursor: none;
+  }
+
+  /* ==========================================================================
+     Microinteracciones
+     ========================================================================== */
+
+  /*
+   * Pulsación: el elemento cede un poco al presionarlo. Es la respuesta táctil
+   * que separa un botón vivo de una caja de texto.
+   */
+  .pulsable {
+    transition: transform 180ms var(--ease-suave), background-color 200ms ease,
+      border-color 200ms ease, color 200ms ease, box-shadow 200ms ease;
+  }
+
+  .pulsable:active {
+    transform: translateY(1px) scale(0.985);
+  }
+
+  /* Barrido de luz que cruza el botón al pasar el puntero. */
+  .barrido {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .barrido::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    transform: translateX(-101%);
+    background: linear-gradient(
+      100deg,
+      transparent 0%,
+      color-mix(in oklab, var(--color-hueso) 22%, transparent) 50%,
+      transparent 100%
+    );
+    transition: transform 620ms var(--ease-suave);
+  }
+
+  .barrido:hover::after,
+  .barrido:focus-visible::after {
+    transform: translateX(101%);
+  }
+
+  /* Subrayado que crece desde la izquierda en los enlaces de texto. */
+  .subrayado {
+    position: relative;
+  }
+
+  .subrayado::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -0.35em;
+    height: 1px;
+    width: 100%;
+    transform: scaleX(0);
+    transform-origin: left;
+    background: currentColor;
+    transition: transform 320ms var(--ease-suave);
+  }
+
+  .subrayado:hover::after,
+  .subrayado:focus-visible::after {
+    transform: scaleX(1);
+  }
+
+  /* ==========================================================================
+     Interacciones de puntero
+     ========================================================================== */
+
+  /*
+   * Reflejo que sigue al puntero por dentro de la pieza. Las coordenadas las
+   * escribe `useReflejoPuntero` en `--mx` y `--my`; mientras nadie las toque
+   * el reflejo queda centrado y a opacidad cero, así que la pieza se ve igual
+   * que si esta clase no estuviera.
+   */
+  .reflejo {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .reflejo::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 380ms var(--ease-suave);
+    background: radial-gradient(
+      22rem 22rem at var(--mx, 50%) var(--my, 50%),
+      color-mix(in oklab, var(--color-accion) 26%, transparent) 0%,
+      color-mix(in oklab, var(--color-accion) 9%, transparent) 32%,
+      transparent 68%
+    );
+  }
+
+  .reflejo:hover::after,
+  .reflejo:focus-within::after {
+    opacity: 1;
+  }
+
+  /* La pieza se levanta un poco y gana sombra al pasar por encima. */
+  .alza {
+    transition: transform 420ms var(--ease-suave), box-shadow 420ms var(--ease-suave);
+  }
+
+  .alza:hover,
+  .alza:focus-within {
+    transform: translateY(-6px);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklab, var(--color-hueso) 18%, transparent),
+      0 34px 70px -30px rgb(0 0 0 / 0.9),
+      0 0 0 1px color-mix(in oklab, var(--color-accion) 22%, transparent);
+  }
+
+  /* La flecha de un enlace avanza cuando se apunta al enlace. */
+  .avanza svg {
+    transition: transform 320ms var(--ease-suave);
+  }
+
+  .avanza:hover svg,
+  .avanza:focus-visible svg {
+    transform: translateX(5px);
+  }
+
+  /*
+   * Rótulo cuyas letras se separan al apuntarlo. Se usa en los titulares que
+   * además son enlace: da respuesta sin recurrir al subrayado.
+   */
+  .abre-letras {
+    transition: letter-spacing 420ms var(--ease-suave), color 260ms ease;
+  }
+
+  .abre-letras:hover,
+  .abre-letras:focus-visible {
+    letter-spacing: 0.045em;
+  }
+
+  /* ==========================================================================
+     Visor 3D
+     ========================================================================== */
+
+  /*
+   * `model-viewer` monta un póster propio dentro de su shadow DOM y lo deja
+   * puesto hasta que el modelo se revela. Si algo impide ese relevo, el póster
+   * tapa la escena con un rectángulo opaco y parece que el modelo no cargó.
+   * Aquí se deja transparente y sin capturar el puntero, de modo que ni oculta
+   * el vehículo ni estorba al arrastrarlo para girarlo.
+   */
+  .visor-3d::part(default-poster) {
+    background: transparent;
+    pointer-events: none;
+  }
+
+  /* ==========================================================================
+     Esqueletos de carga
+     ========================================================================== */
+
+  .esqueleto {
+    position: relative;
+    overflow: hidden;
+    background: color-mix(in oklab, var(--color-hueso) 7%, var(--color-carbon));
+  }
+
+  .esqueleto::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in oklab, var(--color-hueso) 9%, transparent) 50%,
+      transparent 100%
+    );
+    animation: esqueleto-barrer 1500ms ease-in-out infinite;
+  }
+
+  @keyframes esqueleto-barrer {
+    to { transform: translateX(100%); }
+  }
+
+  /* ==========================================================================
+     Transición entre páginas
+     ========================================================================== */
+
+  .pagina-entra {
+    animation: pagina-entrar 420ms var(--ease-suave) both;
+  }
+
+  @keyframes pagina-entrar {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

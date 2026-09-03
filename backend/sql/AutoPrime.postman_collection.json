@@ -1,353 +1,565 @@
 {
   "info": {
-    "name": "AutoPrime API - Tercer Avance",
-    "description": "Coleccion de pruebas de la API AutoPrime.\n\nSENA - Ficha 3406211 - Jose Matias Agudelo Bolivar\n\nCOMO USARLA:\n1. Enciende MySQL (XAMPP) y el backend (npm run dev en la carpeta backend).\n2. Ejecuta primero 'Login administrador': guarda el token automaticamente en la variable {{token}}.\n3. Las demas peticiones ya usan ese token.\n\nIMPORTANTE: en las peticiones POST/PUT/PATCH el cuerpo va en Body > raw > JSON.",
+    "name": "AutoPrime API — FastAPI (cuarto avance)",
+    "description": "API REST del atelier AutoPrime en FastAPI.\n\nCOMO USARLA\n1. Arranca MySQL (XAMPP) y la API:\n   cd backend && venv\\Scripts\\python -m uvicorn app.main:app --port 8000\n2. Ejecuta primero un login: el token se guarda solo en {{token}}\n   y el resto de peticiones lo usan.\n\nLos tres logins de la primera carpeta corresponden a los tres roles.\nCambiar de rol es tan simple como volver a ejecutar el que toque:\nasi se comprueban los 403.\n\nLa API acepta camelCase y snake_case en el cuerpo.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base", "value": "http://localhost:3000/api" },
-    { "key": "token", "value": "" },
-    { "key": "tokenCliente", "value": "" },
-    { "key": "usuarioId", "value": "" }
+    {
+      "key": "base",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
   ],
   "item": [
     {
       "name": "1. Autenticacion",
       "item": [
         {
-          "name": "POST Registro de cliente",
+          "name": "Login administrador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/login",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Guarda el token automaticamente en {{token}}.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"admin@autoprime.com.co\",\n  \"password\": \"Admin2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('201 Creado', () => pm.response.to.have.status(201));",
-                  "pm.test('Devuelve token', () => pm.expect(pm.response.json().token).to.be.a('string'));",
-                  "pm.test('NO devuelve la contrasena', () => {",
-                  "  const u = pm.response.json().usuario;",
-                  "  pm.expect(u.password).to.be.undefined;",
-                  "  pm.expect(u.passwordHash).to.be.undefined;",
-                  "});"
-                ]
-              }
-            },
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "// Documento y correo unicos en cada ejecucion",
-                  "const n = Date.now().toString().slice(-8);",
-                  "pm.collectionVariables.set('doc', '11' + n);",
-                  "pm.collectionVariables.set('correo', 'cliente' + n + '@correo.com');"
+                  "// Guarda el token en la variable de entorno para el resto de peticiones.",
+                  "const d = pm.response.json();",
+                  "if (d.token) {",
+                  "  pm.collectionVariables.set('token', d.token);",
+                  "  console.log('Token guardado. Rol:', d.usuario.rol);",
+                  "}",
+                  "pm.test('respuesta correcta', () => pm.response.to.have.status(200));"
                 ]
               }
             }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "options": { "raw": { "language": "json" } },
-              "raw": "{\n  \"nombre\": \"Laura\",\n  \"apellido\": \"Restrepo\",\n  \"tipoDocumento\": \"CC\",\n  \"numeroDocumento\": \"{{doc}}\",\n  \"direccion\": \"Carrera 7 # 22-14\",\n  \"telefono\": \"3205551188\",\n  \"correo\": \"{{correo}}\",\n  \"password\": \"Furia2026#\",\n  \"confirmarPassword\": \"Furia2026#\"\n}"
-            },
-            "url": { "raw": "{{base}}/auth/registro", "host": ["{{base}}"], "path": ["auth", "registro"] },
-            "description": "Registra un cliente. El backend valida los datos, cifra la contrasena con bcrypt y la guarda en la tabla usuarios."
-          }
+          ]
         },
         {
-          "name": "POST Registro con datos invalidos (400)",
+          "name": "Login empleado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/login",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"empleado@autoprime.com.co\",\n  \"password\": \"Empleado2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('400 Datos invalidos', () => pm.response.to.have.status(400));",
-                  "pm.test('Detalla el error por campo', () => pm.expect(pm.response.json().errores).to.be.an('object'));"
+                  "// Guarda el token en la variable de entorno para el resto de peticiones.",
+                  "const d = pm.response.json();",
+                  "if (d.token) {",
+                  "  pm.collectionVariables.set('token', d.token);",
+                  "  console.log('Token guardado. Rol:', d.usuario.rol);",
+                  "}",
+                  "pm.test('respuesta correcta', () => pm.response.to.have.status(200));"
                 ]
               }
             }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "options": { "raw": { "language": "json" } },
-              "raw": "{\n  \"nombre\": \"A\",\n  \"correo\": \"esto-no-es-un-correo\",\n  \"telefono\": \"123\"\n}"
-            },
-            "url": { "raw": "{{base}}/auth/registro", "host": ["{{base}}"], "path": ["auth", "registro"] },
-            "description": "Demuestra que el backend valida por su cuenta, sin depender del formulario de React."
-          }
+          ]
         },
         {
-          "name": "POST Login administrador",
+          "name": "Login cliente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/login",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"cliente@autoprime.com.co\",\n  \"password\": \"Cliente2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "const t = pm.response.json().token;",
-                  "pm.collectionVariables.set('token', t);",
-                  "pm.test('Genera un JWT de 3 partes', () => pm.expect(t.split('.').length).to.eql(3));"
+                  "// Guarda el token en la variable de entorno para el resto de peticiones.",
+                  "const d = pm.response.json();",
+                  "if (d.token) {",
+                  "  pm.collectionVariables.set('token', d.token);",
+                  "  console.log('Token guardado. Rol:', d.usuario.rol);",
+                  "}",
+                  "pm.test('respuesta correcta', () => pm.response.to.have.status(200));"
                 ]
               }
             }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "options": { "raw": { "language": "json" } },
-              "raw": "{\n  \"correo\": \"admin@autoprime.com.co\",\n  \"password\": \"Admin2026!\"\n}"
-            },
-            "url": { "raw": "{{base}}/auth/login", "host": ["{{base}}"], "path": ["auth", "login"] },
-            "description": "Valida las credenciales contra el hash bcrypt y devuelve un JWT. El token queda guardado en {{token}}."
-          }
+          ]
         },
         {
-          "name": "POST Login cliente",
+          "name": "Registro de cliente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/registro",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "registro"
+              ]
+            },
+            "description": "Alta publica. Deja la sesion iniciada.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Ana\",\n  \"apellido\": \"Restrepo\",\n  \"tipoDocumento\": \"CC\",\n  \"numeroDocumento\": \"1098765432\",\n  \"direccion\": \"Carrera 12 # 45-67\",\n  \"telefono\": \"3105551234\",\n  \"correo\": \"ana.restrepo@ejemplo.com\",\n  \"password\": \"Ana2026Segura!\",\n  \"confirmarPassword\": \"Ana2026Segura!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "pm.collectionVariables.set('tokenCliente', pm.response.json().token);"
+                  "// Guarda el token en la variable de entorno para el resto de peticiones.",
+                  "const d = pm.response.json();",
+                  "if (d.token) {",
+                  "  pm.collectionVariables.set('token', d.token);",
+                  "  console.log('Token guardado. Rol:', d.usuario.rol);",
+                  "}",
+                  "pm.test('creado', () => pm.response.to.have.status(201));"
                 ]
               }
             }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "options": { "raw": { "language": "json" } },
-              "raw": "{\n  \"correo\": \"cliente@autoprime.com.co\",\n  \"password\": \"Cliente2026!\"\n}"
-            },
-            "url": { "raw": "{{base}}/auth/login", "host": ["{{base}}"], "path": ["auth", "login"] }
-          }
+          ]
         },
         {
-          "name": "POST Login con contrasena erronea (401)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": ["pm.test('401 No autorizado', () => pm.response.to.have.status(401));"]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "options": { "raw": { "language": "json" } },
-              "raw": "{\n  \"correo\": \"admin@autoprime.com.co\",\n  \"password\": \"ClaveEquivocada1!\"\n}"
-            },
-            "url": { "raw": "{{base}}/auth/login", "host": ["{{base}}"], "path": ["auth", "login"] }
-          }
-        },
-        {
-          "name": "GET Perfil (token valido)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"]
-              }
-            }
-          ],
+          "name": "Perfil (token)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": { "raw": "{{base}}/auth/perfil", "host": ["{{base}}"], "path": ["auth", "perfil"] },
-            "description": "Endpoint protegido: devuelve el usuario del token junto con sus permisos."
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/perfil",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "perfil"
+              ]
+            }
           }
         },
         {
-          "name": "GET Perfil sin token (401)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": ["pm.test('401 Falta el token', () => pm.response.to.have.status(401));"]
+          "name": "Login incorrecto (401)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/login",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"admin@autoprime.com.co\",\n  \"password\": \"incorrecta\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
               }
             }
-          ],
+          }
+        },
+        {
+          "name": "Perfil sin token (401)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{base}}/auth/perfil", "host": ["{{base}}"], "path": ["auth", "perfil"] }
+            "url": {
+              "raw": "{{base}}/api/auth/perfil",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "perfil"
+              ]
+            }
           }
         }
       ]
     },
     {
-      "name": "2. Usuarios (CRUD)",
+      "name": "2. Usuarios (solo administrador)",
       "item": [
         {
-          "name": "GET Listar usuarios (admin)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "pm.test('Ningun usuario expone su hash', () => {",
-                  "  pm.response.json().usuarios.forEach(u => pm.expect(u.passwordHash).to.be.undefined);",
-                  "});"
-                ]
-              }
-            }
-          ],
+          "name": "Listar",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": { "raw": "{{base}}/usuarios", "host": ["{{base}}"], "path": ["usuarios"] }
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/usuarios",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "usuarios"
+              ]
+            }
           }
         },
         {
-          "name": "GET Listar como cliente (403)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": ["pm.test('403 Sin permisos', () => pm.response.to.have.status(403));"]
-              }
-            }
-          ],
+          "name": "Filtrar por rol",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{tokenCliente}}" }],
-            "url": { "raw": "{{base}}/usuarios", "host": ["{{base}}"], "path": ["usuarios"] },
-            "description": "El token es valido, pero el rol cliente no tiene permiso: control de roles funcionando."
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/usuarios?rol=cliente",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "usuarios"
+              ],
+              "query": [
+                {
+                  "key": "rol",
+                  "value": "cliente"
+                }
+              ]
+            }
           }
         },
         {
-          "name": "POST Crear usuario (admin)",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const n = Date.now().toString().slice(-8);",
-                  "pm.collectionVariables.set('doc2', '22' + n);",
-                  "pm.collectionVariables.set('correo2', 'empleado' + n + '@correo.com');"
-                ]
+          "name": "Buscar",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
               }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('201 Creado', () => pm.response.to.have.status(201));",
-                  "pm.collectionVariables.set('usuarioId', pm.response.json().usuario.id);"
-                ]
-              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/usuarios?buscar=admin",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "usuarios"
+              ],
+              "query": [
+                {
+                  "key": "buscar",
+                  "value": "admin"
+                }
+              ]
             }
-          ],
+          }
+        },
+        {
+          "name": "Consultar uno",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/usuarios/1",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear (con rol)",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
+            "url": {
+              "raw": "{{base}}/api/usuarios",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "usuarios"
+              ]
+            },
             "body": {
               "mode": "raw",
-              "options": { "raw": { "language": "json" } },
-              "raw": "{\n  \"nombre\": \"Pedro\",\n  \"apellido\": \"Gomez\",\n  \"tipoDocumento\": \"CC\",\n  \"numeroDocumento\": \"{{doc2}}\",\n  \"direccion\": \"Calle 10 # 20-30\",\n  \"telefono\": \"3109998877\",\n  \"correo\": \"{{correo2}}\",\n  \"password\": \"Pedro2026#\",\n  \"rol\": \"empleado\"\n}"
-            },
-            "url": { "raw": "{{base}}/usuarios", "host": ["{{base}}"], "path": ["usuarios"] }
-          }
-        },
-        {
-          "name": "GET Usuario por id",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": {
-              "raw": "{{base}}/usuarios/{{usuarioId}}",
-              "host": ["{{base}}"],
-              "path": ["usuarios", "{{usuarioId}}"]
-            }
-          }
-        },
-        {
-          "name": "PUT Actualizar usuario",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"]
+              "raw": "{\n  \"nombre\": \"Ana\",\n  \"apellido\": \"Restrepo\",\n  \"tipoDocumento\": \"CC\",\n  \"numeroDocumento\": \"1055443322\",\n  \"direccion\": \"Carrera 12 # 45-67\",\n  \"telefono\": \"3105551234\",\n  \"correo\": \"nuevo.empleado@autoprime.com.co\",\n  \"password\": \"Ana2026Segura!\",\n  \"rol\": \"empleado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
               }
             }
-          ],
+          }
+        },
+        {
+          "name": "Actualizar",
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
+            "url": {
+              "raw": "{{base}}/api/usuarios/2",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "2"
+              ]
+            },
             "body": {
               "mode": "raw",
-              "options": { "raw": { "language": "json" } },
-              "raw": "{\n  \"nombre\": \"Pedro Andres\",\n  \"telefono\": \"3112223344\"\n}"
-            },
-            "url": {
-              "raw": "{{base}}/usuarios/{{usuarioId}}",
-              "host": ["{{base}}"],
-              "path": ["usuarios", "{{usuarioId}}"]
+              "raw": "{\n  \"direccion\": \"Calle 80 # 20-15\",\n  \"telefono\": \"3201112233\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
         {
-          "name": "PATCH Cambiar estado a inactivo",
+          "name": "Inactivar",
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
+            "url": {
+              "raw": "{{base}}/api/usuarios/2/estado",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "2",
+                "estado"
+              ]
+            },
             "body": {
               "mode": "raw",
-              "options": { "raw": { "language": "json" } },
-              "raw": "{\n  \"estado\": \"inactivo\"\n}"
-            },
-            "url": {
-              "raw": "{{base}}/usuarios/{{usuarioId}}/estado",
-              "host": ["{{base}}"],
-              "path": ["usuarios", "{{usuarioId}}", "estado"]
-            },
-            "description": "Se prefiere inactivar antes que borrar, para conservar el historico."
+              "raw": "{\n  \"estado\": \"inactivo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           }
         },
         {
-          "name": "DELETE Eliminar usuario",
+          "name": "Reactivar",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/usuarios/2/estado",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "2",
+                "estado"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"activo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Eliminar",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
-              "raw": "{{base}}/usuarios/{{usuarioId}}",
-              "host": ["{{base}}"],
-              "path": ["usuarios", "{{usuarioId}}"]
+              "raw": "{{base}}/api/usuarios/99",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "99"
+              ]
             }
           }
         }
@@ -357,162 +569,636 @@
       "name": "3. Productos",
       "item": [
         {
-          "name": "GET Catalogo completo (publico)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "pm.test('Trae los 10 vehiculos', () => pm.expect(pm.response.json().productos.length).to.eql(10));"
-                ]
+          "name": "Catalogo completo (publico)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/productos",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "productos"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filtrar por familia",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/productos?familia=edicion",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "productos"
+              ],
+              "query": [
+                {
+                  "key": "familia",
+                  "value": "edicion"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Por slug (publico)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/productos/pugnator-tricolore",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "productos",
+                "pugnator-tricolore"
+              ]
+            },
+            "description": "La misma ruta acepta el id numerico o el slug."
+          }
+        },
+        {
+          "name": "Por id (publico)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/productos/1",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "productos",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Slug inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/productos/no-existe",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "productos",
+                "no-existe"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/productos",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "productos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"vehiculo-de-prueba\",\n  \"marca\": \"MANSORY\",\n  \"modelo\": \"Prueba\",\n  \"familia\": \"gama\",\n  \"base\": \"Vehiculo base de prueba\",\n  \"lema\": \"Creado desde Postman\",\n  \"descripcion\": \"Registro de ejemplo para probar el CRUD del catalogo.\",\n  \"imagen\": \"mansory-pugnator-perfil.webp\",\n  \"anio\": 2025,\n  \"kilometraje\": 0,\n  \"precio\": 500000000,\n  \"unidades\": 3,\n  \"motor\": \"4.0 L V8 biturbo\",\n  \"potencia\": \"700 hp\",\n  \"aceleracion\": \"3,2 s\",\n  \"velocidad\": \"320 km/h\",\n  \"transmision\": \"Doble embrague 8 vel.\",\n  \"traccion\": \"Integral\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
               }
             }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": { "raw": "{{base}}/productos", "host": ["{{base}}"], "path": ["productos"] },
-            "description": "Publico: el catalogo se consulta sin iniciar sesion."
           }
         },
         {
-          "name": "GET Filtrar por familia",
+          "name": "Actualizar",
           "request": {
-            "method": "GET",
-            "header": [],
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
-              "raw": "{{base}}/productos?familia=edicion",
-              "host": ["{{base}}"],
-              "path": ["productos"],
-              "query": [{ "key": "familia", "value": "edicion" }]
-            }
-          }
-        },
-        {
-          "name": "GET Un vehiculo por slug",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base}}/productos/pugnator-tricolore",
-              "host": ["{{base}}"],
-              "path": ["productos", "pugnator-tricolore"]
-            }
-          }
-        },
-        {
-          "name": "GET Slug inexistente (404)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": ["pm.test('404 No encontrado', () => pm.response.to.have.status(404));"]
+              "raw": "{{base}}/api/productos/1",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "productos",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"precio\": 3300000000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
               }
             }
-          ],
+          }
+        },
+        {
+          "name": "Eliminar",
           "request": {
-            "method": "GET",
-            "header": [],
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
-              "raw": "{{base}}/productos/no-existe",
-              "host": ["{{base}}"],
-              "path": ["productos", "no-existe"]
+              "raw": "{{base}}/api/productos/99",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "productos",
+                "99"
+              ]
             }
           }
         }
       ]
     },
     {
-      "name": "4. Citas (agendamiento)",
+      "name": "4. Servicios",
       "item": [
         {
-          "name": "GET Disponibilidad de una fecha",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const d = new Date();",
-                  "d.setDate(d.getDate() + 7);",
-                  "while (d.getDay() === 0) d.setDate(d.getDate() + 1);",
-                  "pm.collectionVariables.set('fecha', d.toISOString().slice(0, 10));"
-                ]
-              }
-            }
-          ],
+          "name": "Listar (publico)",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base}}/citas/disponibilidad?fecha={{fecha}}",
-              "host": ["{{base}}"],
-              "path": ["citas", "disponibilidad"],
-              "query": [{ "key": "fecha", "value": "{{fecha}}" }]
-            },
-            "description": "Devuelve las franjas del dia marcando cuales estan libres."
-          }
-        },
-        {
-          "name": "POST Agendar cita (cliente)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": ["pm.test('201 Cita creada', () => pm.response.to.have.status(201));"]
-              }
+              "raw": "{{base}}/api/servicios",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "servicios"
+              ]
             }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{tokenCliente}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "options": { "raw": { "language": "json" } },
-              "raw": "{\n  \"fecha\": \"{{fecha}}\",\n  \"hora\": \"11:00\",\n  \"servicioId\": 1,\n  \"productoId\": 1,\n  \"notas\": \"Interesado en financiacion\"\n}"
-            },
-            "url": { "raw": "{{base}}/citas", "host": ["{{base}}"], "path": ["citas"] }
           }
         },
         {
-          "name": "POST Misma franja ocupada (409)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": ["pm.test('409 Franja ocupada', () => pm.response.to.have.status(409));"]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{tokenCliente}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "options": { "raw": { "language": "json" } },
-              "raw": "{\n  \"fecha\": \"{{fecha}}\",\n  \"hora\": \"11:00\",\n  \"servicioId\": 1,\n  \"productoId\": 1\n}"
-            },
-            "url": { "raw": "{{base}}/citas", "host": ["{{base}}"], "path": ["citas"] }
-          }
-        },
-        {
-          "name": "GET Mis citas (cliente)",
+          "name": "Consultar uno",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{tokenCliente}}" }],
-            "url": { "raw": "{{base}}/citas", "host": ["{{base}}"], "path": ["citas"] },
-            "description": "El cliente solo ve sus propias citas; el admin ve todas."
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/servicios/1",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "servicios",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/servicios",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "servicios"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Detallado premium\",\n  \"descripcion\": \"Limpieza y correccion de pintura.\",\n  \"duracionMin\": 180,\n  \"precio\": 450000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Actualizar",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/servicios/1",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "servicios",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"precio\": 120000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Eliminar",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/servicios/99",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "servicios",
+                "99"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Citas",
+      "item": [
+        {
+          "name": "Disponibilidad (publico)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/citas/disponibilidad?fecha=2026-09-10&productoId=1",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "citas",
+                "disponibilidad"
+              ],
+              "query": [
+                {
+                  "key": "fecha",
+                  "value": "2026-09-10"
+                },
+                {
+                  "key": "productoId",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Resumen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/citas/resumen",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "citas",
+                "resumen"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Listar",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/citas",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "citas"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filtrar por estado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/citas?estado=pendiente",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "citas"
+              ],
+              "query": [
+                {
+                  "key": "estado",
+                  "value": "pendiente"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Agendar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/citas",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "citas"
+              ]
+            },
+            "description": "El dueno sale del token, no del cuerpo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": 1,\n  \"productoId\": 1,\n  \"fecha\": \"2026-09-10\",\n  \"hora\": \"10:00\",\n  \"notas\": \"Creada desde Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Confirmar (personal)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/citas/1/estado",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "citas",
+                "1",
+                "estado"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"confirmada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancelar",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/citas/1/estado",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "citas",
+                "1",
+                "estado"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"cancelada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Eliminar",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/citas/99",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "citas",
+                "99"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Domingo (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/citas",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "citas"
+              ]
+            },
+            "description": "Los domingos el taller no atiende.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": 1,\n  \"fecha\": \"2026-09-06\",\n  \"hora\": \"10:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Sistema",
+      "item": [
+        {
+          "name": "Presentacion",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/",
+              "host": [
+                "{{base}}"
+              ],
+              "path": []
+            }
+          }
+        },
+        {
+          "name": "Salud",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/salud",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "salud"
+              ]
+            }
           }
         }
       ]

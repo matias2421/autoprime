@@ -5,7 +5,9 @@
  * componentes no repitan la misma logica de fetch en cada pantalla.
  */
 
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+// El backend pasa a ser FastAPI (cuarto avance) y escucha en el 8000.
+// La URL real se toma de VITE_API_URL cuando esta definida.
+const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 const CLAVE_TOKEN = "autoprime:token";
 
 export const guardarToken = (token, recordar = false) => {
@@ -44,6 +46,7 @@ export class ErrorApi extends Error {
     this.name = "ErrorApi";
     this.estado = estado;
     this.errores = errores || {};
+    this.codigo = null;
   }
 }
 
@@ -79,11 +82,25 @@ async function peticion(ruta, { metodo = "GET", cuerpo, autenticado = true } = {
   }
 
   if (!respuesta.ok) {
-    throw new ErrorApi(
+    /*
+     * FastAPI devuelve los errores como {codigo, mensaje, ruta, detalles},
+     * donde `detalles` es una lista [{campo, problema}]. Los formularios de
+     * la app esperan un objeto {campo: mensaje} para marcar cada input, asi
+     * que la lista se aplana aqui y no en cada pantalla.
+     */
+    const errores = Array.isArray(datos?.detalles)
+      ? Object.fromEntries(datos.detalles.map((d) => [d.campo, d.problema]))
+      : datos?.errores;
+
+    const fallo = new ErrorApi(
       datos?.mensaje || `Error ${respuesta.status}`,
       respuesta.status,
-      datos?.errores
+      errores
     );
+    // `codigo` es estable y sirve para decidir en el frontend; el mensaje
+    // puede cambiar de redaccion.
+    fallo.codigo = datos?.codigo ?? `http_${respuesta.status}`;
+    throw fallo;
   }
 
   return datos;

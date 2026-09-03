@@ -1,11 +1,21 @@
-# AutoPrime — Concesionario de altas prestaciones
+# AutoPrime — Atelier automotriz
 
-**Segundo Avance · Proyecto en React**
+**Cuarto Avance · React + Vite + FastAPI**
 Aprendiz: Jose Matías Agudelo Bolívar · Ficha 3406211 · Ambiente 702 · ADSO — SENA
 Instructor: Jhan Hader Muñoz
 
-Aplicación web de un concesionario construida con **React 19 + Vite 8**,
-enrutada con **React Router DOM 7** y estilizada por completo con **Tailwind CSS 4**.
+Aplicación web de un atelier automotriz con **React 19 + Vite 8** en el
+frontend y **FastAPI + SQLAlchemy** sobre **MySQL** en el backend.
+
+```
+React + Vite  →  FastAPI  →  SQLAlchemy  →  MySQL
+   :5173          :8000                      :3306
+```
+
+En el cuarto avance el backend pasó de **Express a FastAPI** conservando el
+dominio, la base de datos y el contrato de la API, de modo que **el frontend
+no cambió ni un componente**. El backend anterior queda en `backend-express/`
+como evidencia del tercer avance.
 
 ---
 
@@ -40,21 +50,45 @@ una incidencia en el repositorio y se elimina.**
 
 ## Cómo ejecutar
 
+Hacen falta tres cosas encendidas: MySQL, el backend y el frontend.
+
+**1. Base de datos** — arranca MySQL desde el panel de XAMPP. Solo la primera vez:
+
+```bash
+"C:/xampp/mysql/bin/mysql.exe" -u root < backend/sql/autoprime.sql
+node backend-express/sql/seed-usuarios.js
+```
+
+**2. Backend (FastAPI)**
+
+```bash
+cd backend
+python -m venv venv
+venv/Scripts/activate
+pip install -r requirements.txt
+cp .env.example .env
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+Documentación interactiva en **http://localhost:8000/docs**.
+
+**3. Frontend**
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Abre <http://localhost:5173>. El backend Express es independiente:
+La web queda en **http://localhost:5173**.
 
-```bash
-cd backend
-npm install
-npm run dev
-```
+### Cuentas de prueba
 
----
+| Correo | Contraseña | Rol |
+|---|---|---|
+| `admin@autoprime.com.co` | `Admin2026!` | administrador |
+| `empleado@autoprime.com.co` | `Empleado2026!` | empleado |
+| `cliente@autoprime.com.co` | `Cliente2026!` | cliente |
 
 ## Cumplimiento de los requerimientos
 
@@ -368,6 +402,43 @@ lienzo quede a cero.
 El visor es `@google/model-viewer`, importado dinámicamente: queda en su propio
 trozo de 1 MB que solo se descarga al pulsar "Ver en 3D". El paquete principal
 no cambia de tamaño.
+
+## Cuarto avance: el backend en FastAPI
+
+El requisito era **reemplazar la tecnología del backend** manteniendo todo lo
+demás. El resultado: 29 endpoints en FastAPI sobre la misma base MySQL, y el
+frontend intacto.
+
+| | Tercer avance | Cuarto avance |
+|---|---|---|
+| Framework | Express 5 | **FastAPI** |
+| Lenguaje | JavaScript | **Python 3.14** |
+| Acceso a datos | `mysql2` a mano | **SQLAlchemy 2** |
+| Validación | Funciones propias | **Pydantic** |
+| Contraseñas | bcrypt | **bcrypt** (los mismos hashes) |
+| Tokens | `jsonwebtoken` | **python-jose** |
+| Documentación | — | **Swagger en `/docs`** |
+
+Tres decisiones explican por qué el frontend no cambió:
+
+1. **La API habla camelCase.** El código Python usa `snake_case`, pero todos
+   los esquemas heredan de una base con `alias_generator=to_camel`. Pydantic
+   traduce en ambos sentidos, así que `tipoDocumento` sigue funcionando sin
+   tocar los 19 sitios donde aparece.
+2. **Las respuestas van en los mismos sobres.** El backend anterior devolvía
+   `{"usuarios": [...]}` y no una lista suelta; se conservó ese contrato.
+3. **Los hashes son compatibles.** bcrypt es el mismo algoritmo y el mismo
+   formato `$2b$10$`, de modo que las cuentas creadas por el backend en Node
+   siguen iniciando sesión sin volver a registrarse.
+
+Arquitectura, endpoints y el resto de decisiones en
+[`backend/README.md`](backend/README.md).
+
+**Pruebas:** `backend/pruebas_api.py` ejercita **65 casos por HTTP**
+—autenticación, registro con validaciones, CRUD de las cuatro entidades,
+control de roles (401 frente a 403) y las reglas de la agenda—. Además hay
+colección de Postman con 40 peticiones en
+`backend/sql/AutoPrime.postman_collection.json`.
 
 ## Imágenes
 

@@ -1,0 +1,26 @@
+# Dependencias del backend de AutoPrime (cuarto avance).
+# Versiones fijas para que la instalacion sea reproducible.
+
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+pydantic==2.13.5
+pydantic-settings==2.15.0
+email-validator==2.3.0
+
+# Base de datos: SQLAlchemy sincrono sobre MySQL/MariaDB (XAMPP).
+SQLAlchemy==2.0.52
+PyMySQL==1.2.0
+
+# Seguridad.
+# Se usa bcrypt directamente en lugar de passlib: passlib no recibe
+# mantenimiento y rompe con bcrypt 4.x al leer su atributo __about__.
+# Los hashes son los mismos, asi que los usuarios creados por el backend
+# anterior en Node siguen pudiendo iniciar sesion.
+bcrypt==5.0.0
+python-jose[cryptography]==3.5.0
+
+# Lectura del .env (pydantic-settings lo usa por debajo).
+python-dotenv==1.2.3
+
+# Formularios del login OAuth2 que usa la documentacion de Swagger.
+python-multipart==0.0.32

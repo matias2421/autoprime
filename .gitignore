@@ -1,6 +1,12 @@
 # Dependencias
 node_modules/
 
+# Python: entorno virtual y bytecode del backend en FastAPI
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
 # Secretos: el .env real nunca se sube.
 # La plantilla de referencia es backend/.env.example
 .env

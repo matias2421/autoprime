@@ -32,7 +32,13 @@ import NoEncontrado from "../pages/NoEncontrado";
  */
 function PieCondicional() {
   const { pathname } = useLocation();
-  return pathname === "/" ? null : <Footer />;
+  // Mismo margen que `main`: el pie queda fuera de <main> y hay que
+  // apartarlo del rail por separado.
+  return pathname === "/" ? null : (
+    <div className="lg:pl-[72px]">
+      <Footer />
+    </div>
+  );
 }
 
 /** Lleva la vista al inicio en cada cambio de ruta. */
@@ -57,7 +63,7 @@ function AppRouter() {
         <IrArriba />
         <Header />
 
-        <main id="contenido" className="flex-1">
+        <main id="contenido" className="flex-1 lg:pl-[72px]">
           {/* Anima la entrada de cada pagina; se reinicia al cambiar de ruta. */}
           <TransicionPagina>
             <Routes>

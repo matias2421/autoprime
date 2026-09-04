@@ -44,10 +44,6 @@ class AvisoRecuperacion(Esquema):
     ok: bool = True
     mensaje: str
     expira_en_minutos: int
-    # En un despliegue real el token viaja por correo y nunca vuelve aquí.
-    # Este proyecto no tiene servidor de correo, así que en desarrollo se
-    # devuelve para poder completar y demostrar el flujo entero.
-    token: str | None = None
 
 
 class RestablecerContrasena(MezclaContrasena):

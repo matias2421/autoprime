@@ -49,6 +49,35 @@ class Configuracion(BaseSettings):
     # una credencial de un solo uso y cuanto menos tiempo exista, mejor.
     minutos_expiracion_recuperacion: int = 30
 
+    # --- Correo saliente ---
+    # Dirección pública del frontend: con ella se arma el enlace que viaja en
+    # el correo, así que en un despliegue real apunta al dominio, no a
+    # localhost.
+    url_frontend: str = "http://localhost:5173"
+
+    # Vacío significa "sin servidor de correo": entonces el enlace se escribe
+    # en el registro en lugar de enviarse, para que el flujo siga siendo
+    # probable antes de configurar el buzón.
+    smtp_host: str = ""
+    smtp_puerto: int = 587
+    smtp_usuario: str = ""
+    smtp_password: str = ""
+    smtp_remitente: str = ""
+
+    @property
+    def correo_configurado(self) -> bool:
+        """Si falta cualquiera de las tres piezas, no hay envío posible."""
+        return bool(self.smtp_host and self.smtp_usuario and self.smtp_password)
+
+    @property
+    def remitente_correo(self) -> str:
+        """Quién firma el mensaje; por defecto, la cuenta que lo envía."""
+        return (
+            self.smtp_remitente
+            or self.smtp_usuario
+            or "no-responder@autoprime.com.co"
+        )
+
     @property
     def url_base_datos(self) -> str:
         """Cadena de conexión de SQLAlchemy, armada con las piezas de arriba."""

@@ -17,6 +17,7 @@ import ModeloDetalle from "../pages/ModeloDetalle";
 import QuienesSomos from "../pages/QuienesSomos";
 import Contacto from "../pages/Contacto";
 import IniciarSesion from "../pages/IniciarSesion";
+import RestablecerPassword from "../pages/RestablecerPassword";
 import AgendarCita from "../pages/AgendarCita";
 import PanelAdmin from "../pages/panel/PanelAdmin";
 import PanelEmpleado from "../pages/panel/PanelEmpleado";
@@ -67,6 +68,9 @@ function AppRouter() {
               <Route path="/quienes-somos" element={<QuienesSomos />} />
               <Route path="/contacto" element={<Contacto />} />
               <Route path="/login" element={<IniciarSesion />} />
+
+              {/* Se llega desde el enlace del correo, con ?token= */}
+              <Route path="/restablecer" element={<RestablecerPassword />} />
 
               {/* Se puede ver sin sesion; al confirmar pide iniciar sesion. */}
               <Route path="/agendar" element={<AgendarCita />} />

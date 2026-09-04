@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "AutoPrime API — FastAPI (cuarto avance)",
-    "description": "API REST del atelier AutoPrime en FastAPI.\n\nCOMO USARLA\n1. Arranca MySQL (XAMPP) y la API:\n   cd backend && venv\\Scripts\\python -m uvicorn app.main:app --port 8000\n2. Ejecuta primero un login: el token se guarda solo en {{token}}\n   y el resto de peticiones lo usan.\n\nLos tres logins de la primera carpeta corresponden a los tres roles.\nCambiar de rol es tan simple como volver a ejecutar el que toque:\nasi se comprueban los 403.\n\nLa API acepta camelCase y snake_case en el cuerpo.",
+    "description": "API REST del atelier AutoPrime en FastAPI.\n\nCOMO USARLA\n1. Arranca MySQL (XAMPP) y la API:\n   cd backend && venv\\Scripts\\python -m uvicorn app.main:app --port 8000\n2. Ejecuta primero un login: el token se guarda solo en {{token}}\n   y el resto de peticiones lo usan.\n\nLos tres logins de la primera carpeta corresponden a los tres roles.\nCambiar de rol es tan simple como volver a ejecutar el que toque:\nasi se comprueban los 403.\n\nRECUPERACION DE CONTRASENA\nEl paso 1 envia un correo con el enlace; el token no vuelve en la respuesta.\nAbre el correo, copia el token del enlace y pegalo en la variable\ntokenRecuperacion antes de lanzar el paso 2.\n\nLa API acepta camelCase y snake_case en el cuerpo.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -314,7 +314,7 @@
                 "recuperar"
               ]
             },
-            "description": "Responde igual exista o no la cuenta, para no revelar que correos estan registrados. Guarda el token en {{tokenRecuperacion}}.",
+            "description": "Envia el enlace por correo. Responde igual exista o no la cuenta, para no revelar que correos estan registrados, y NO devuelve el token: hay que sacarlo del enlace que llega al buzon.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"correo\": \"cliente@autoprime.com.co\"\n}",
@@ -331,13 +331,13 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "// En desarrollo la API devuelve el token; en produccion iria por correo.",
+                  "// El token NO vuelve en la respuesta: viaja por correo y solo por correo.",
+                  "// Copia el token del enlace que llega al buzon y pegalo en la variable",
+                  "// tokenRecuperacion de la coleccion para usar el paso 2.",
                   "const d = pm.response.json();",
-                  "if (d.token) {",
-                  "  pm.collectionVariables.set('tokenRecuperacion', d.token);",
-                  "  console.log('Enlace valido', d.expiraEnMinutos, 'minutos');",
-                  "}",
-                  "pm.test('respuesta correcta', () => pm.response.to.have.status(200));"
+                  "pm.test('no expone el enlace', () => pm.expect(d.token).to.be.undefined);",
+                  "pm.test('respuesta correcta', () => pm.response.to.have.status(200));",
+                  "console.log('Enlace enviado. Valido', d.expiraEnMinutos, 'minutos.');"
                 ]
               }
             }
@@ -364,7 +364,7 @@
                 "restablecer"
               ]
             },
-            "description": "El enlace sirve una sola vez: al cambiar la contrasena deja de valer aunque no haya expirado.",
+            "description": "Pega en la variable tokenRecuperacion el token del enlace que llego al correo. Sirve una sola vez: al cambiar la contrasena deja de valer aunque no haya expirado.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"token\": \"{{tokenRecuperacion}}\",\n  \"password\": \"Cliente2026!\",\n  \"confirmarPassword\": \"Cliente2026!\"\n}",

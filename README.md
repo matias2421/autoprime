@@ -435,9 +435,18 @@ Arquitectura, endpoints y el resto de decisiones en
 [`backend/README.md`](backend/README.md).
 
 El cuarto avance añade además la **recuperación de contraseña olvidada**, que
-hasta el tercero solo estaba simulada en el frontend. Son dos endpoints: uno
-emite un enlace temporal y otro lo canjea por la contraseña nueva. El enlace
-caduca a los 30 minutos, sirve una sola vez y no vale como token de sesión.
+hasta el tercero solo estaba simulada en el frontend. El primer endpoint envía
+por correo un enlace a `/restablecer`, y el segundo lo canjea por la contraseña
+nueva. El token **no vuelve en la respuesta**: viaja por correo y solo por
+correo, que es lo que obliga a demostrar que se controla el buzón de la cuenta.
+El enlace caduca a los 30 minutos, sirve una sola vez y no vale como token de
+sesión.
+
+Para que el correo salga de verdad hay que rellenar `SMTP_HOST`, `SMTP_USUARIO`
+y `SMTP_PASSWORD` en `backend/.env` —con Gmail, una contraseña de aplicación—.
+Si se dejan vacíos, el enlace se escribe en el registro del servidor y el flujo
+se puede probar igual. Los detalles están en
+[`backend/README.md`](backend/README.md).
 
 **Pruebas:** `backend/pruebas_api.py` ejercita **81 casos por HTTP**
 —autenticación, registro con validaciones, CRUD de las cuatro entidades,

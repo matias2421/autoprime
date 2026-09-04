@@ -11,12 +11,15 @@ Cada prueba declara el código que espera; al final se imprime el recuento.
 """
 
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
 from datetime import date, datetime, timedelta
 
-API = "http://127.0.0.1:8000"
+# Se puede apuntar a otra instancia sin tocar el archivo:
+#   set API_AUTOPRIME=http://127.0.0.1:8020
+API = os.environ.get("API_AUTOPRIME", "http://127.0.0.1:8000")
 
 correctas = 0
 fallidas = 0
@@ -61,6 +64,24 @@ def probar(descripcion, esperado, metodo, ruta, cuerpo=None, token=None):
         print(f"        {json.dumps(salida, ensure_ascii=False)[:180]}")
 
     return salida
+
+
+def token_de_recuperacion(correo: str) -> str:
+    """Emite el token de recuperacion igual que lo hace la API.
+
+    Esto es preparacion, no lo que se prueba. Desde que el enlace viaja por
+    correo, la respuesta ya no lo devuelve —esa es justamente la propiedad que
+    se comprueba mas abajo—, y sin buzon esta es la unica forma de alcanzar el
+    segundo paso. Lo que se ejercita sigue siendo el endpoint por HTTP.
+    """
+    from app.core.base_datos import FabricaDeSesiones
+    from app.core.seguridad import crear_token_recuperacion
+    from app.crud import usuarios as crud
+
+    with FabricaDeSesiones() as sesion:
+        usuario = crud.obtener_por_correo(sesion, correo)
+        assert usuario is not None, f"no existe la cuenta {correo}"
+        return crear_token_recuperacion(usuario.id, usuario.password_hash)
 
 
 def seccion(titulo):
@@ -469,9 +490,13 @@ aviso = probar(
     "/api/auth/recuperar",
     {"correo": CORREO_PRUEBA},
 )
-token_recuperacion = aviso["token"]
-assert token_recuperacion, "en desarrollo la respuesta debe traer el token"
-print(f"        -> enlace valido {aviso['expiraEnMinutos']} minutos")
+# La propiedad importante de este endpoint: el token NO sale por aqui. Va por
+# correo y solo por correo, que es lo que obliga a demostrar que se controla el
+# buzon de la cuenta.
+assert "token" not in aviso, "el enlace no debe volver en la respuesta"
+print(f"        -> enlace valido {aviso['expiraEnMinutos']} minutos, enviado por correo")
+
+token_recuperacion = token_de_recuperacion(CORREO_PRUEBA)
 
 # Un correo sin cuenta responde igual: si respondiera distinto, este endpoint
 # serviria para averiguar que correos estan registrados.
@@ -482,9 +507,8 @@ sin_cuenta = probar(
     "/api/auth/recuperar",
     {"correo": "nadie-en-absoluto@autoprime.com.co"},
 )
-assert sin_cuenta["mensaje"] == aviso["mensaje"], "el mensaje debe ser identico"
-assert sin_cuenta["token"] is None, "no debe emitirse token para un correo sin cuenta"
-print("        -> mensaje identico y sin token: no revela si la cuenta existe")
+assert sin_cuenta == aviso, "las dos respuestas deben ser identicas"
+print("        -> respuesta identica: no revela si la cuenta existe")
 
 # Un token de recuperacion identifica al usuario, pero no debe abrir sesion.
 probar(

@@ -1,8 +1,9 @@
 """Autenticación: registro, login y perfil."""
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, BackgroundTasks, status
 
 from app.core.configuracion import configuracion
+from app.core.correo import enviar_enlace_recuperacion
 from app.core.seguridad import (
     TIPO_RECUPERACION,
     JWTError,
@@ -94,33 +95,40 @@ def perfil(usuario: UsuarioActual) -> UsuarioSalida:
     summary="Solicitar la recuperación de la contraseña",
 )
 def solicitar_recuperacion(
-    datos: SolicitudRecuperacion, sesion: SesionDep
+    datos: SolicitudRecuperacion, sesion: SesionDep, tareas: BackgroundTasks
 ) -> AvisoRecuperacion:
-    """Primer paso: pedir el enlace para volver a entrar.
+    """Primer paso: pedir por correo el enlace para volver a entrar.
+
+    El token no vuelve en la respuesta: viaja por correo y solo por correo. Es
+    la parte que hace que el flujo signifique algo, porque obliga a demostrar
+    que se controla el buzón de la cuenta. Devolverlo aquí convertiría "olvidé
+    mi contraseña" en "cámbiale la contraseña a quien yo diga".
 
     Responde exactamente lo mismo exista o no la cuenta. Si dijera "ese correo
     no está registrado", cualquiera podría ir probando direcciones hasta saber
     cuáles tienen cuenta en el atelier.
+
+    El envío se encola como tarea de fondo: hablar con el servidor de correo
+    puede tardar segundos y quien rellenó el formulario no tiene por qué
+    esperarlos.
     """
     usuario = crud_usuarios.obtener_por_correo(sesion, datos.correo)
 
-    token = None
     if usuario is not None and usuario.estado == "activo":
-        token = crear_token_recuperacion(usuario.id, usuario.password_hash)
+        tareas.add_task(
+            enviar_enlace_recuperacion,
+            usuario.correo,
+            usuario.nombre,
+            crear_token_recuperacion(usuario.id, usuario.password_hash),
+        )
 
-    aviso = AvisoRecuperacion(
+    return AvisoRecuperacion(
         mensaje=(
             "Si el correo corresponde a una cuenta activa, enviamos las "
             "instrucciones para restablecer la contraseña."
         ),
         expira_en_minutos=configuracion.minutos_expiracion_recuperacion,
     )
-
-    # Fuera de desarrollo el token no sale por la respuesta: iría por correo.
-    if configuracion.entorno == "desarrollo":
-        aviso.token = token
-
-    return aviso
 
 
 @router.post(

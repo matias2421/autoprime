@@ -91,7 +91,7 @@ Base: `http://localhost:8000` · Todo bajo `/api` · Ninguna ruta lleva barra fi
 | POST | `/api/auth/registro` | público — alta de cliente, devuelve sesión iniciada |
 | POST | `/api/auth/login` | público — devuelve el JWT |
 | GET | `/api/auth/perfil` | token — revalida la sesión |
-| POST | `/api/auth/recuperar` | público — pide el enlace de recuperación |
+| POST | `/api/auth/recuperar` | público — envía por correo el enlace |
 | POST | `/api/auth/restablecer` | público — canjea el enlace por la contraseña nueva |
 
 ### Usuarios · solo administrador
@@ -176,17 +176,23 @@ Que un JWT tenga firma válida no significa que la cuenta siga vigente. La
 dependencia `usuario_actual` relee el usuario, de modo que inactivar a alguien
 surte efecto de inmediato y no cuando caduque el token que ya tiene abierto.
 
-### La recuperación de contraseña son dos pasos
+### La recuperación de contraseña pasa por el correo
 
-`POST /api/auth/recuperar` comprueba quién pide el cambio y emite un token;
-`POST /api/auth/restablecer` lo canjea por la contraseña nueva. Separarlos es
-lo que evita que baste con saber un correo para cambiarle la clave a alguien.
+`POST /api/auth/recuperar` comprueba quién pide el cambio y **envía por correo**
+un enlace a `/restablecer?token=…`; `POST /api/auth/restablecer` lo canjea por
+la contraseña nueva.
 
-Tres detalles que no se ven en la firma de los endpoints:
+El token no vuelve en la respuesta del primer endpoint, y ahí está el sentido
+de todo el mecanismo: obliga a demostrar que se controla el buzón de la cuenta.
+Devolverlo convertiría «olvidé mi contraseña» en «cámbiale la contraseña a
+quien yo diga», que es justo lo que hay que impedir.
+
+Tres detalles más que no se ven en la firma de los endpoints:
 
 - **El primero responde igual exista o no la cuenta.** Si dijera "ese correo
   no está registrado", cualquiera podría ir probando direcciones hasta saber
-  cuáles tienen cuenta en el atelier.
+  cuáles tienen cuenta en el atelier. Por lo mismo, si el envío falla tampoco
+  se le cuenta a quien lo pidió: queda en el registro del servidor.
 - **El enlace sirve una sola vez, sin tabla de tokens gastados.** El token
   lleva una huella del hash de la contraseña vigente. Al restablecerla el hash
   cambia, la huella deja de coincidir y el enlace queda inservible aunque no
@@ -197,9 +203,35 @@ Tres detalles que no se ven en la firma de los endpoints:
   contraseña" para entrar en la cuenta sin llegar a cambiarla. Cada endpoint
   comprueba que el token que recibe es del tipo que le corresponde.
 
-El proyecto no tiene servidor de correo. Con `ENTORNO=desarrollo` el token
-vuelve en la respuesta para poder completar y demostrar el flujo entero; fuera
-de ahí no sale de la API y viajaría por email.
+El envío se encola con `BackgroundTasks`: hablar con el servidor de correo
+puede tardar segundos y quien rellenó el formulario no tiene por qué
+esperarlos.
+
+### Configurar el correo saliente
+
+Se usa `smtplib` de la biblioteca estándar en lugar de una dependencia nueva:
+el proyecto manda un único tipo de mensaje y no necesita plantillas ni
+proveedores intercambiables.
+
+En `.env`:
+
+```
+URL_FRONTEND=http://localhost:5173
+SMTP_HOST=smtp.gmail.com
+SMTP_PUERTO=587
+SMTP_USUARIO=tu-cuenta@gmail.com
+SMTP_PASSWORD=la-contrasena-de-aplicacion
+```
+
+Con Gmail hace falta una **contraseña de aplicación**, no la del correo: se
+activa la verificación en dos pasos y se genera en
+`myaccount.google.com/apppasswords`. La contraseña normal no sirve, y la de
+aplicación se puede revocar sin tocar la cuenta.
+
+**Si `SMTP_HOST` queda vacío**, el mensaje no se pierde en silencio: el enlace
+se escribe en el registro del servidor con un aviso. Así el flujo se puede
+probar antes de tener buzón, y queda claro que era configuración pendiente y
+no un fallo del código.
 
 ### Dos rutas para la misma alta
 

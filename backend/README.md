@@ -69,6 +69,7 @@ backend/
 │   └── main.py                App, CORS y manejadores de error
 ├── sql/autoprime.sql          Esquema y datos iniciales
 ├── pruebas_api.py             81 pruebas de extremo a extremo
+├── probar_correo.py           diagnostico de la configuracion SMTP
 ├── requirements.txt
 └── .env.example
 ```
@@ -223,10 +224,31 @@ SMTP_USUARIO=tu-cuenta@gmail.com
 SMTP_PASSWORD=la-contrasena-de-aplicacion
 ```
 
-Con Gmail hace falta una **contraseña de aplicación**, no la del correo: se
-activa la verificación en dos pasos y se genera en
-`myaccount.google.com/apppasswords`. La contraseña normal no sirve, y la de
-aplicación se puede revocar sin tocar la cuenta.
+Con Gmail hace falta una **contraseña de aplicación**, no la del correo. La
+normal no sirve, y la de aplicación se puede revocar sin tocar la cuenta.
+
+El orden importa: **primero la verificación en dos pasos**
+(`myaccount.google.com/security`) y después
+`myaccount.google.com/apppasswords`. Sin el primer paso, esa página responde
+«la opción de configuración que buscas no está disponible para tu cuenta» sin
+explicar por qué: Google no ofrece contraseñas de aplicación a las cuentas que
+no tienen la verificación activada.
+
+Si no se quiere tocar la cuenta de Google, cualquier proveedor con SMTP sirve
+—Brevo y Mailtrap tienen plan gratuito—: solo cambian `SMTP_HOST`,
+`SMTP_USUARIO` y `SMTP_PASSWORD`.
+
+Para no ir cambiando el `.env` a ciegas:
+
+```bash
+venv\Scripts\python probar_correo.py
+```
+
+Enseña la configuración leída —sin descubrir la contraseña—, intenta la
+entrega real y traduce cada fallo posible a lo que hay que corregir:
+autenticación rechazada, servidor inalcanzable, puerto y modo de cifrado que
+no encajan, o la contraseña pegada con los espacios que Google muestra al
+generarla.
 
 **Si `SMTP_HOST` queda vacío**, el mensaje no se pierde en silencio: el enlace
 se escribe en el registro del servidor con un aviso. Así el flujo se puede

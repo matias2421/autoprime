@@ -360,6 +360,42 @@
   @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
   }
+
+  /* --- Impresión y PDF --- */
+  @media print {
+    /* En pantalla el ancho lo fija el diseño; en papel lo fija la hoja, así
+       que se suelta el máximo y se deja que la maqueta se reacomode. */
+    .lienzo { max-width: none; padding: 0; }
+
+    /* Que un requisito no se parta por la mitad es lo que hace legible el
+       documento impreso: enunciado, pistas y captura tienen que ir juntos.
+       Si uno no cabe entero en una hoja el navegador lo parte igual, que es
+       preferible a dejar media página en blanco. */
+    .requisito, .evidencia, .servicio, .cierre { break-inside: avoid; }
+    .envoltura-tabla, tr { break-inside: avoid; }
+    h2 { break-after: avoid; }
+
+    /* La cabecera y la puesta en marcha ocupan su propia hoja: así el
+       registro de requisitos empieza limpio en la siguiente. */
+    .registro { break-before: page; }
+
+    /* Las capturas son el contenido, no un adorno: se les deja el ancho
+       completo de la caja de texto. */
+    .evidencia img { width: 100%; }
+
+    /* En pantalla las órdenes largas se desplazan de lado; en papel no hay
+       hacia dónde desplazarse, así que se parten en varias líneas. Sin esto
+       el comando de arranque salía cortado a media palabra. */
+    .orden {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      overflow: visible;
+    }
+
+    /* Lo mismo para las fichas de consola, aunque su contenido ya viene
+       recortado a lo ancho de la ventana con que se generaron. */
+    .envoltura-tabla { overflow: visible; }
+  }
 </style>
 
 <div class="lienzo">

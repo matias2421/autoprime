@@ -148,7 +148,13 @@ probar(
     "/api/auth/login",
     {"correo": "no-es-un-correo", "password": "Cualquiera1!"},
 )
-probar("perfil con token", 200, "GET", "/api/auth/perfil", token=tokens["admin"])
+perfil = probar("perfil con token", 200, "GET", "/api/auth/perfil", token=tokens["admin"])
+# La forma importa tanto como el codigo: el frontend reconstruye la sesion al
+# recargar leyendo `datos.usuario`. Devolverlo suelto daba 200 y aun asi
+# echaba del sitio a quien pulsara F5 estando dentro.
+assert "usuario" in perfil, "el perfil debe venir dentro del sobre {usuario: ...}"
+assert perfil["usuario"]["correo"] == "admin@autoprime.com.co"
+assert "passwordHash" not in perfil["usuario"], "no debe salir el hash"
 probar("perfil sin token -> 401", 401, "GET", "/api/auth/perfil")
 probar(
     "perfil con token invalido -> 401",

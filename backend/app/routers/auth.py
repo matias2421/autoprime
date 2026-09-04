@@ -24,6 +24,7 @@ from app.schemas.auth import (
     SolicitudRecuperacion,
 )
 from app.schemas.comunes import RespuestaSimple
+from app.schemas.sobres import SobreUsuario
 from app.schemas.usuario import UsuarioRegistro, UsuarioSalida
 
 router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
@@ -73,10 +74,15 @@ def iniciar_sesion(credenciales: Credenciales, sesion: SesionDep) -> Sesion:
     )
 
 
-@router.get("/perfil", response_model=UsuarioSalida, summary="Perfil propio")
-def perfil(usuario: UsuarioActual) -> UsuarioSalida:
-    """Devuelve el usuario del token. Sirve para revalidar la sesión."""
-    return UsuarioSalida.desde_modelo(usuario)
+@router.get("/perfil", response_model=SobreUsuario, summary="Perfil propio")
+def perfil(usuario: UsuarioActual) -> SobreUsuario:
+    """Devuelve el usuario del token. Sirve para revalidar la sesión.
+
+    Va dentro del sobre `{usuario: ...}` como el resto de la API, y no suelto:
+    el frontend reconstruye la sesión al recargar leyendo `datos.usuario`, así
+    que devolverlo pelado dejaba fuera a quien pulsara F5 estando dentro.
+    """
+    return SobreUsuario(usuario=UsuarioSalida.desde_modelo(usuario))
 
 
 # --------------------------------------------------------------------------

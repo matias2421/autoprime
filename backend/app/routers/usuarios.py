@@ -4,16 +4,39 @@ from fastapi import APIRouter, Query, status
 
 from app.crud import usuarios as crud_usuarios
 from app.dependencias import SesionDep, SoloAdmin, UsuarioRuta
+from app.routers.auth import registrar
+from app.schemas.auth import Sesion
 from app.schemas.comunes import EstadoCuenta, NombreRol, RespuestaSimple
 from app.schemas.sobres import SobreUsuario, SobreUsuarios
 from app.schemas.usuario import (
     CambioEstado,
     UsuarioActualizar,
     UsuarioCrear,
+    UsuarioRegistro,
     UsuarioSalida,
 )
 
 router = APIRouter(prefix="/api/usuarios", tags=["Usuarios"])
+
+
+@router.post(
+    "/registro",
+    response_model=Sesion,
+    status_code=status.HTTP_201_CREATED,
+    summary="Registrar un cliente (misma alta que POST /api/auth/registro)",
+)
+def registro_publico(datos: UsuarioRegistro, sesion: SesionDep) -> Sesion:
+    """Alta pública de clientes, sin token.
+
+    Es la misma función que atiende `POST /api/auth/registro`, expuesta
+    también aquí porque es la ruta que nombra la lista de chequeo del
+    entregable. Se reutiliza el manejador en lugar de copiarlo para que no
+    puedan acabar comportándose distinto.
+
+    Va declarada antes que `/{usuario_id}` para que "registro" no se intente
+    interpretar como un identificador.
+    """
+    return registrar(datos, sesion)
 
 
 @router.get("", response_model=SobreUsuarios, summary="Listar usuarios")

@@ -45,6 +45,10 @@ class Configuracion(BaseSettings):
     horas_expiracion_token: int = 8
     rondas_bcrypt: int = 10
 
+    # El enlace para restablecer la contrasena vive minutos, no horas: es
+    # una credencial de un solo uso y cuanto menos tiempo exista, mejor.
+    minutos_expiracion_recuperacion: int = 30
+
     @property
     def url_base_datos(self) -> str:
         """Cadena de conexión de SQLAlchemy, armada con las piezas de arriba."""

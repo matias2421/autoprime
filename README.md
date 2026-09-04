@@ -434,11 +434,16 @@ Tres decisiones explican por qué el frontend no cambió:
 Arquitectura, endpoints y el resto de decisiones en
 [`backend/README.md`](backend/README.md).
 
-**Pruebas:** `backend/pruebas_api.py` ejercita **65 casos por HTTP**
+El cuarto avance añade además la **recuperación de contraseña olvidada**, que
+hasta el tercero solo estaba simulada en el frontend. Son dos endpoints: uno
+emite un enlace temporal y otro lo canjea por la contraseña nueva. El enlace
+caduca a los 30 minutos, sirve una sola vez y no vale como token de sesión.
+
+**Pruebas:** `backend/pruebas_api.py` ejercita **81 casos por HTTP**
 —autenticación, registro con validaciones, CRUD de las cuatro entidades,
-control de roles (401 frente a 403) y las reglas de la agenda—. Además hay
-colección de Postman con 40 peticiones en
-`backend/sql/AutoPrime.postman_collection.json`.
+control de roles (401 frente a 403), las reglas de la agenda y el flujo
+completo de recuperación—. Además hay colección de Postman con 44 peticiones
+en `backend/sql/AutoPrime.postman_collection.json`.
 
 ## Imágenes
 

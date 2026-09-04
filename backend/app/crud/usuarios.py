@@ -133,6 +133,19 @@ def actualizar(sesion: Session, usuario: Usuario, cambios: dict) -> Usuario:
     return usuario
 
 
+def cambiar_contrasena(sesion: Session, usuario: Usuario, nueva: str) -> Usuario:
+    """Reemplaza el hash por el de la contraseña nueva.
+
+    Al cambiar el hash quedan invalidados de paso todos los enlaces de
+    recuperación emitidos antes, porque su huella se calculó con el hash
+    anterior y ya no coincidirá.
+    """
+    usuario.password_hash = hashear_contrasena(nueva)
+    sesion.commit()
+    sesion.refresh(usuario)
+    return usuario
+
+
 def cambiar_estado(sesion: Session, usuario: Usuario, estado: str) -> Usuario:
     usuario.estado = estado
     sesion.commit()

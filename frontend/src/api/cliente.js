@@ -123,6 +123,14 @@ export const authApi = {
   login: (correo, password) =>
     api.post("/auth/login", { correo, password }, { autenticado: false }),
   perfil: () => api.get("/auth/perfil"),
+
+  // Recuperacion de contrasena olvidada: dos pasos, dos peticiones.
+  // Ninguna lleva token de sesion; precisamente se usan cuando no se puede
+  // iniciar sesion.
+  recuperar: (correo) =>
+    api.post("/auth/recuperar", { correo }, { autenticado: false }),
+  restablecer: (datos) =>
+    api.post("/auth/restablecer", datos, { autenticado: false }),
 };
 
 export const usuariosApi = {

@@ -14,7 +14,7 @@ import json
 import sys
 import urllib.error
 import urllib.request
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 API = "http://127.0.0.1:8000"
 
@@ -140,7 +140,10 @@ probar(
 # --------------------------------------------------------------------------
 seccion("REGISTRO")
 
-sufijo = date.today().strftime("%H%M%S") + str(abs(hash(str(date.today()))) % 9999)
+# Sufijo distinto en cada ejecucion, para que los correos y documentos que
+# se dan de alta no choquen con los de la corrida anterior. Los microsegundos
+# van delante a proposito: dos ejecuciones seguidas caen en el mismo segundo.
+sufijo = datetime.now().strftime("%S%f")
 nuevo = {
     "nombre": "Prueba",
     "apellido": "Automatica",
@@ -430,6 +433,180 @@ probar(
     tokens["cliente"],
 )
 probar("eliminar (admin)", 200, "DELETE", f"/api/citas/{cita_id}", token=tokens["admin"])
+
+# --------------------------------------------------------------------------
+seccion("RECUPERACION DE CONTRASENA")
+
+# La prueba se da de alta su propia cuenta. No usa las tres de siempre porque
+# el flujo termina cambiando la contrasena, y tampoco la del bloque REGISTRO:
+# el bloque USUARIOS la elimina antes de llegar hasta aqui.
+CORREO_PRUEBA = f"olvido{sufijo[:6]}@autoprime.com.co"
+CONTRASENA_VIEJA = "Olvidada2026!"
+NUEVA_CONTRASENA = "Renovada2026!"
+
+probar(
+    "alta de la cuenta con la que se prueba el olvido",
+    201,
+    "POST",
+    "/api/auth/registro",
+    {
+        "nombre": "Olvidadiza",
+        "apellido": "Prueba",
+        "tipo_documento": "CC",
+        "numero_documento": f"7{sufijo[:8]}",
+        "direccion": "Calle 45 # 12-34",
+        "telefono": "3009998877",
+        "correo": CORREO_PRUEBA,
+        "password": CONTRASENA_VIEJA,
+        "confirmar_password": CONTRASENA_VIEJA,
+    },
+)
+
+aviso = probar(
+    "solicitar el enlace",
+    200,
+    "POST",
+    "/api/auth/recuperar",
+    {"correo": CORREO_PRUEBA},
+)
+token_recuperacion = aviso["token"]
+assert token_recuperacion, "en desarrollo la respuesta debe traer el token"
+print(f"        -> enlace valido {aviso['expiraEnMinutos']} minutos")
+
+# Un correo sin cuenta responde igual: si respondiera distinto, este endpoint
+# serviria para averiguar que correos estan registrados.
+sin_cuenta = probar(
+    "correo inexistente -> misma respuesta",
+    200,
+    "POST",
+    "/api/auth/recuperar",
+    {"correo": "nadie-en-absoluto@autoprime.com.co"},
+)
+assert sin_cuenta["mensaje"] == aviso["mensaje"], "el mensaje debe ser identico"
+assert sin_cuenta["token"] is None, "no debe emitirse token para un correo sin cuenta"
+print("        -> mensaje identico y sin token: no revela si la cuenta existe")
+
+# Un token de recuperacion identifica al usuario, pero no debe abrir sesion.
+probar(
+    "el token de recuperacion NO vale como sesion -> 401",
+    401,
+    "GET",
+    "/api/auth/perfil",
+    token=token_recuperacion,
+)
+# Y al reves: el de sesion no sirve para restablecer.
+probar(
+    "el token de sesion NO vale para restablecer -> 401",
+    401,
+    "POST",
+    "/api/auth/restablecer",
+    {"token": tokens["admin"], "password": NUEVA_CONTRASENA,
+     "confirmarPassword": NUEVA_CONTRASENA},
+)
+
+probar(
+    "token inventado -> 401",
+    401,
+    "POST",
+    "/api/auth/restablecer",
+    {"token": "esto.no.es.un.token.de.verdad", "password": NUEVA_CONTRASENA,
+     "confirmarPassword": NUEVA_CONTRASENA},
+)
+probar(
+    "contrasena nueva debil -> 422",
+    422,
+    "POST",
+    "/api/auth/restablecer",
+    {"token": token_recuperacion, "password": "corta", "confirmarPassword": "corta"},
+)
+probar(
+    "confirmacion distinta -> 422",
+    422,
+    "POST",
+    "/api/auth/restablecer",
+    {"token": token_recuperacion, "password": NUEVA_CONTRASENA,
+     "confirmarPassword": "Otra2026!"},
+)
+
+probar(
+    "restablecer con el token valido",
+    200,
+    "POST",
+    "/api/auth/restablecer",
+    {"token": token_recuperacion, "password": NUEVA_CONTRASENA,
+     "confirmarPassword": NUEVA_CONTRASENA},
+)
+probar(
+    "entra con la contrasena nueva",
+    200,
+    "POST",
+    "/api/auth/login",
+    {"correo": CORREO_PRUEBA, "password": NUEVA_CONTRASENA},
+)
+probar(
+    "la contrasena vieja ya no sirve -> 401",
+    401,
+    "POST",
+    "/api/auth/login",
+    {"correo": CORREO_PRUEBA, "password": CONTRASENA_VIEJA},
+)
+# El enlace es de un solo uso: la huella se calculo con el hash anterior.
+probar(
+    "reutilizar el mismo enlace -> 401",
+    401,
+    "POST",
+    "/api/auth/restablecer",
+    {"token": token_recuperacion, "password": "Tercera2026!",
+     "confirmarPassword": "Tercera2026!"},
+)
+
+# --------------------------------------------------------------------------
+seccion("ALIAS /api/usuarios/registro")
+
+# La lista de chequeo nombra esta ruta; el frontend usa la de auth. Ambas
+# ejecutan el mismo manejador, asi que deben comportarse igual.
+# Se escribe en camelCase a proposito: es como lo envia el frontend, y de paso
+# comprueba que los alias de Pydantic siguen aceptando esa forma.
+alias = {
+    "nombre": "Alias",
+    "apellido": "Prueba",
+    "tipoDocumento": "CC",
+    "numeroDocumento": f"8{sufijo[:8]}",
+    "direccion": "Avenida 68 # 90-12",
+    "telefono": "3012223344",
+    "correo": f"alias{sufijo[:6]}@autoprime.com.co",
+    "password": "Alias2026!",
+    "confirmarPassword": "Alias2026!",
+}
+
+registrado = probar(
+    "alta por la ruta de la lista de chequeo",
+    201,
+    "POST",
+    "/api/usuarios/registro",
+    alias,
+)
+assert registrado["usuario"]["rol"] == "cliente", "el alta publica siempre es cliente"
+probar("mismo correo duplicado -> 409", 409, "POST", "/api/usuarios/registro", alias)
+
+# Limpieza: las dos cuentas de estos bloques no las borra ningun otro, y sin
+# esto la base se iria llenando de usuarios de prueba en cada ejecucion.
+for etiqueta, correo_creado in (
+    ("cuenta del olvido", CORREO_PRUEBA),
+    ("cuenta del alias", alias["correo"]),
+):
+    encontrados = peticion(
+        "GET", f"/api/usuarios?buscar={correo_creado}", token=tokens["admin"]
+    )[1]
+    for u in encontrados.get("usuarios", []):
+        if u["correo"] == correo_creado:
+            probar(
+                f"limpieza: eliminar la {etiqueta}",
+                200,
+                "DELETE",
+                f"/api/usuarios/{u['id']}",
+                token=tokens["admin"],
+            )
 
 # --------------------------------------------------------------------------
 print()

@@ -68,7 +68,7 @@ backend/
 │   ├── errores.py             Excepciones de dominio
 │   └── main.py                App, CORS y manejadores de error
 ├── sql/autoprime.sql          Esquema y datos iniciales
-├── pruebas_api.py             65 pruebas de extremo a extremo
+├── pruebas_api.py             81 pruebas de extremo a extremo
 ├── requirements.txt
 └── .env.example
 ```
@@ -91,6 +91,8 @@ Base: `http://localhost:8000` · Todo bajo `/api` · Ninguna ruta lleva barra fi
 | POST | `/api/auth/registro` | público — alta de cliente, devuelve sesión iniciada |
 | POST | `/api/auth/login` | público — devuelve el JWT |
 | GET | `/api/auth/perfil` | token — revalida la sesión |
+| POST | `/api/auth/recuperar` | público — pide el enlace de recuperación |
+| POST | `/api/auth/restablecer` | público — canjea el enlace por la contraseña nueva |
 
 ### Usuarios · solo administrador
 
@@ -98,6 +100,7 @@ Base: `http://localhost:8000` · Todo bajo `/api` · Ninguna ruta lleva barra fi
 |---|---|
 | GET | `/api/usuarios` — filtros `?rol` `?estado` `?buscar` |
 | POST | `/api/usuarios` |
+| POST | `/api/usuarios/registro` — **pública**, misma alta que `/api/auth/registro` |
 | GET · PUT · DELETE | `/api/usuarios/{id}` |
 | PATCH | `/api/usuarios/{id}/estado` |
 
@@ -173,6 +176,38 @@ Que un JWT tenga firma válida no significa que la cuenta siga vigente. La
 dependencia `usuario_actual` relee el usuario, de modo que inactivar a alguien
 surte efecto de inmediato y no cuando caduque el token que ya tiene abierto.
 
+### La recuperación de contraseña son dos pasos
+
+`POST /api/auth/recuperar` comprueba quién pide el cambio y emite un token;
+`POST /api/auth/restablecer` lo canjea por la contraseña nueva. Separarlos es
+lo que evita que baste con saber un correo para cambiarle la clave a alguien.
+
+Tres detalles que no se ven en la firma de los endpoints:
+
+- **El primero responde igual exista o no la cuenta.** Si dijera "ese correo
+  no está registrado", cualquiera podría ir probando direcciones hasta saber
+  cuáles tienen cuenta en el atelier.
+- **El enlace sirve una sola vez, sin tabla de tokens gastados.** El token
+  lleva una huella del hash de la contraseña vigente. Al restablecerla el hash
+  cambia, la huella deja de coincidir y el enlace queda inservible aunque no
+  haya expirado; de paso caducan los que se hubieran pedido antes.
+- **Los dos tipos de token no son intercambiables.** El de recuperación
+  identifica al mismo usuario y lleva la misma firma, así que sin la marca
+  `tipo` serviría como cabecera `Authorization`: bastaría decir "olvidé mi
+  contraseña" para entrar en la cuenta sin llegar a cambiarla. Cada endpoint
+  comprueba que el token que recibe es del tipo que le corresponde.
+
+El proyecto no tiene servidor de correo. Con `ENTORNO=desarrollo` el token
+vuelve en la respuesta para poder completar y demostrar el flujo entero; fuera
+de ahí no sale de la API y viajaría por email.
+
+### Dos rutas para la misma alta
+
+`POST /api/auth/registro` y `POST /api/usuarios/registro` ejecutan el mismo
+manejador. La primera es la que usa el frontend desde el segundo avance; la
+segunda es la que nombra la lista de chequeo del entregable. Se reutiliza la
+función en lugar de copiarla para que no puedan acabar comportándose distinto.
+
 ### bcrypt en vez de passlib
 
 El PDF sugiere `passlib/bcrypt`, pero passlib ya no recibe mantenimiento y
@@ -189,9 +224,11 @@ usuarios creados por el backend en Node siguen pudiendo iniciar sesión.
 venv\Scripts\python pruebas_api.py
 ```
 
-**65 pruebas** de extremo a extremo por HTTP, igual que las hará Postman:
+**81 pruebas** de extremo a extremo por HTTP, igual que las hará Postman:
 autenticación, registro con sus validaciones, CRUD de las cuatro entidades,
-control de roles (401 frente a 403) y las reglas de la agenda —franja
-ocupada, fecha pasada, domingo, hora fuera de horario—.
+control de roles (401 frente a 403), las reglas de la agenda —franja ocupada,
+fecha pasada, domingo, hora fuera de horario— y el flujo completo de
+recuperación de contraseña, incluido que el enlace no se pueda reutilizar
+ni sirva para abrir sesión.
 
 También hay colección de Postman en `sql/AutoPrime.postman_collection.json`.

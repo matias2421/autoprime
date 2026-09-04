@@ -12,6 +12,10 @@
     {
       "key": "token",
       "value": ""
+    },
+    {
+      "key": "tokenRecuperacion",
+      "value": ""
     }
   ],
   "item": [
@@ -288,12 +292,177 @@
               ]
             }
           }
+        },
+        {
+          "name": "Olvide mi contrasena (paso 1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/recuperar",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "recuperar"
+              ]
+            },
+            "description": "Responde igual exista o no la cuenta, para no revelar que correos estan registrados. Guarda el token en {{tokenRecuperacion}}.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"cliente@autoprime.com.co\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// En desarrollo la API devuelve el token; en produccion iria por correo.",
+                  "const d = pm.response.json();",
+                  "if (d.token) {",
+                  "  pm.collectionVariables.set('tokenRecuperacion', d.token);",
+                  "  console.log('Enlace valido', d.expiraEnMinutos, 'minutos');",
+                  "}",
+                  "pm.test('respuesta correcta', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Restablecer contrasena (paso 2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/restablecer",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "restablecer"
+              ]
+            },
+            "description": "El enlace sirve una sola vez: al cambiar la contrasena deja de valer aunque no haya expirado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{tokenRecuperacion}}\",\n  \"password\": \"Cliente2026!\",\n  \"confirmarPassword\": \"Cliente2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Correo sin cuenta -> misma respuesta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/recuperar",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "recuperar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"nadie@autoprime.com.co\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
         }
       ]
     },
     {
       "name": "2. Usuarios (solo administrador)",
       "item": [
+        {
+          "name": "Registro publico (alias de la lista de chequeo)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/usuarios/registro",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "registro"
+              ]
+            },
+            "description": "Misma alta que POST /api/auth/registro. Es la ruta que nombra la lista de chequeo del entregable.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Ana\",\n  \"apellido\": \"Restrepo\",\n  \"tipoDocumento\": \"CC\",\n  \"numeroDocumento\": \"1098765432\",\n  \"direccion\": \"Carrera 12 # 45-67\",\n  \"telefono\": \"3105551234\",\n  \"correo\": \"ana.restrepo@ejemplo.com\",\n  \"password\": \"Ana2026Segura!\",\n  \"confirmarPassword\": \"Ana2026Segura!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el token en la variable de entorno para el resto de peticiones.",
+                  "const d = pm.response.json();",
+                  "if (d.token) {",
+                  "  pm.collectionVariables.set('token', d.token);",
+                  "  console.log('Token guardado. Rol:', d.usuario.rol);",
+                  "}",
+                  "pm.test('creado', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
         {
           "name": "Listar",
           "request": {

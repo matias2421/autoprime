@@ -12,7 +12,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.base_datos import obtener_sesion
-from app.core.seguridad import JWTError, decodificar_token
+from app.core.seguridad import TIPO_SESION, JWTError, decodificar_token
 from app.crud import citas as crud_citas
 from app.crud import productos as crud_productos
 from app.crud import servicios as crud_servicios
@@ -44,6 +44,12 @@ def usuario_actual(
     except JWTError:
         # python-jose usa una sola excepción para firma inválida y expiración.
         raise NoAutenticado("El token no es válido o ya expiró.")
+
+    # El token de recuperación identifica al mismo usuario y lleva la misma
+    # firma, así que sin esta comprobación serviría para entrar en la cuenta
+    # en lugar de solo para cambiar la contraseña.
+    if carga.get("tipo") != TIPO_SESION:
+        raise NoAutenticado("Este token no sirve para iniciar sesión.")
 
     identificador = carga.get("sub")
     if identificador is None:

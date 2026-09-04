@@ -238,6 +238,28 @@ Si no se quiere tocar la cuenta de Google, cualquier proveedor con SMTP sirve
 —Brevo y Mailtrap tienen plan gratuito—: solo cambian `SMTP_HOST`,
 `SMTP_USUARIO` y `SMTP_PASSWORD`.
 
+### De qué dirección sale el correo
+
+`SMTP_REMITENTE` no elige la dirección: elige lo que se **declara**. Gmail
+reescribe la cabecera a la cuenta con la que se hizo el login, de modo que
+poner ahí una dirección ajena no cambia nada de lo que ve quien recibe. Es la
+misma regla que impide el correo falsificado, y no tiene rodeo.
+
+Para que el mensaje salga de verdad desde otra dirección hay que autenticarse
+con ella: crear esa cuenta, activarle la verificación en dos pasos y usar **su**
+contraseña de aplicación. Los tres valores del `.env` cambian; el código, no.
+
+Si lo único que se busca es que en la bandeja se lea el nombre del atelier,
+basta con anteponerlo a la dirección propia, sin cuenta nueva:
+
+```
+SMTP_REMITENTE=AutoPrime <la-cuenta-de-siempre@gmail.com>
+```
+
+`probar_correo.py` avisa cuando la dirección declarada no coincide con la
+autenticada, porque el síntoma —un correo que «llega mal» sin motivo
+aparente— no lleva a la causa por sí solo.
+
 Para no ir cambiando el `.env` a ciegas:
 
 ```bash

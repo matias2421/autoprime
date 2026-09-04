@@ -17,6 +17,7 @@ import socket
 import ssl
 import sys
 from email.message import EmailMessage
+from email.utils import parseaddr
 
 from app.core.configuracion import configuracion
 
@@ -54,6 +55,31 @@ def revisar_configuracion() -> bool:
         print()
         print("  AVISO: la contrasena tiene espacios. Google la muestra en")
         print("  grupos de cuatro por comodidad, pero hay que pegarla junta.")
+
+    # Enviar en nombre de una direccion ajena es lo que hace posible el correo
+    # falsificado, asi que los proveedores no lo permiten: Gmail reescribe la
+    # cabecera a la cuenta autenticada y quien recibe ve esa, no la declarada.
+    # Sin este aviso, el sintoma seria un correo que "llega mal" sin motivo.
+    direccion = parseaddr(configuracion.remitente_correo)[1].lower()
+    if direccion and direccion != configuracion.smtp_usuario.lower():
+        print()
+        print("  AVISO: SMTP_REMITENTE apunta a una direccion distinta de la")
+        print(f"  cuenta autenticada ({configuracion.smtp_usuario}).")
+        print()
+        print(f"    declarado : {direccion}")
+        print(f"    real      : {configuracion.smtp_usuario}")
+        print()
+        print("  Gmail reescribira el remitente a la cuenta autenticada, salvo")
+        print("  que esa direccion este dada de alta como alias verificado en")
+        print("  Gmail > Configuracion > Cuentas > Enviar como.")
+        print()
+        print("  Para que el correo salga de verdad desde otra direccion hay")
+        print("  que autenticarse con ella: crear esa cuenta, activarle la")
+        print("  verificacion en dos pasos y usar SU contrasena de aplicacion.")
+        print()
+        print("  Si solo se busca que en la bandeja se lea 'AutoPrime', basta")
+        print("  con el nombre delante de la direccion propia:")
+        print(f"    SMTP_REMITENTE=AutoPrime <{configuracion.smtp_usuario}>")
 
     return True
 

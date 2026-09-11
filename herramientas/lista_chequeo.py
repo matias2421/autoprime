@@ -339,7 +339,9 @@ def main() -> int:
     datos = [
         ("Nombre del Aprendiz:", "Jose Matías Agudelo Bolívar", valor_verde,
          "Fecha de Presentación:", "2026-09-10", valor_azul),
-        ("Documento de Identidad:", "", valor_azul,
+        # El documento va como texto y no como número: es un identificador,
+        # no una cantidad, y así Excel no le mete separador de miles.
+        ("Documento de Identidad:", "1038928023", valor_azul,
          "Ficha de Caracterización:", "3406211", valor_blanco),
         ("Programa de Formación:", "ADSO (Análisis y Desarrollo de Software)",
          valor_blanco, "Trimestre / Ambiente:", "03 / 702", valor_blanco),
@@ -460,7 +462,9 @@ def main() -> int:
                      "académica para el SENA ADSO.", pie_nota)
 
     # --- Presentación e impresión ---------------------------------------
-    hoja.freeze_panes(fila_encabezado + 1, 0)
+    # Sin panel congelado: la cabecera del instrumento mide más de 400 px, así
+    # que al inmovilizarla se comía la pantalla y dejaba una franja tan
+    # estrecha que las capturas no se llegaban a ver. Todo se desplaza junto.
     hoja.set_landscape()
     hoja.set_paper(9)                    # A4
     hoja.fit_to_pages(1, 0)              # una página de ancho: el PDF del

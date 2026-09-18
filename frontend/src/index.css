@@ -73,6 +73,40 @@
   html {
     scroll-behavior: smooth;
     background-color: var(--color-negro);
+
+    /* La barra de la pagina, a juego con el resto.
+     *
+     * El navegador la pinta con el tema del sistema, que en Windows es clara:
+     * sobre un sitio negro de arriba abajo queda una franja blanca en el
+     * borde, y es lo primero que ve el ojo cada vez que hay que desplazarse.
+     *
+     * `color-scheme: dark` es la manera corta de decirlo: ademas de la barra,
+     * pone en oscuro los controles que dibuja el propio navegador -los menus
+     * desplegables, el selector de fecha de la agenda-, que hasta ahora salian
+     * en blanco encima del formulario.
+     */
+    color-scheme: dark;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-trazo) var(--color-negro);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-negro);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-trazo);
+    border: 2px solid var(--color-negro);
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-plomo);
   }
 
   body {
@@ -373,6 +407,43 @@
     background: color-mix(in oklab, var(--color-negro) 94%, transparent);
     backdrop-filter: blur(30px) saturate(185%);
     -webkit-backdrop-filter: blur(30px) saturate(185%);
+  }
+
+  /* La barra de desplazamiento del raíl.
+   *
+   * El raíl se desplaza en vertical porque en una pantalla baja, con las
+   * familias desplegadas y las pantallas privadas, el contenido no cabe. Pero
+   * la barra que pinta el navegador viene con el tema del sistema —blanca y
+   * ancha en Windows— y sobre el cristal negro es lo primero que se ve: una
+   * franja clara partiendo el menú por la mitad.
+   *
+   * No se oculta, se viste. Ocultarla dejaría el raíl desplazándose sin decir
+   * que se desplaza, y entonces nadie sabría que abajo queda algo.
+   *
+   * `scrollbar-width`/`scrollbar-color` es lo estándar; la parte de
+   * `::-webkit-scrollbar` está para los navegadores que todavía no lo
+   * atienden. Las dos dicen lo mismo a propósito.
+   */
+  .rail-lateral {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-trazo) transparent;
+  }
+
+  .rail-lateral::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .rail-lateral::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .rail-lateral::-webkit-scrollbar-thumb {
+    background: var(--color-trazo);
+    border-radius: 999px;
+  }
+
+  .rail-lateral::-webkit-scrollbar-thumb:hover {
+    background: var(--color-plomo);
   }
 
   /* Encima de fotografía a todo color hace falta más cuerpo. */

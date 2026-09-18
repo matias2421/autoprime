@@ -21,15 +21,33 @@ const FAMILIAS = [
 
 const AGENDAR = { a: "/agendar", clave: "nav.agendar", icono: "reloj" };
 
-// Las cuatro pantallas del quinto avance. Solo aparecen con sesion
-// iniciada, y son las mismas para los tres roles: lo que cambia es lo que
-// devuelve la API detras, no la navegacion.
-const PRIVADOS = [
+// Las cuatro pantallas del quinto avance, nombradas segun quien mira.
+//
+// Las rutas son las mismas para los tres roles porque el recurso es el
+// mismo visto desde dos lados, y la API ya decide que devuelve: al personal
+// las cifras del negocio, a un cliente las suyas. Duplicar las pantallas
+// duplicaria tambien cada arreglo futuro.
+//
+// Pero los ROTULOS no pueden ser los mismos. Con "VENTAS" y "TABLERO" en el
+// menu de un cliente, la pantalla parecia la del administrador aunque los
+// datos fueran otros: el rotulo es lo unico que dice de quien son las cifras
+// antes de entrar.
+const PRIVADOS_PERSONAL = [
   { a: "/panel/tablero", texto: "Tablero", icono: "rayo" },
   { a: "/panel/ventas", texto: "Ventas", icono: "etiqueta" },
   { a: "/panel/facturas", texto: "Facturas", icono: "documento" },
   { a: "/panel/pqr", texto: "PQR", icono: "alerta" },
 ];
+
+const PRIVADOS_CLIENTE = [
+  { a: "/panel/tablero", texto: "Mi resumen", icono: "rayo" },
+  { a: "/panel/ventas", texto: "Mis compras", icono: "etiqueta" },
+  { a: "/panel/facturas", texto: "Mis facturas", icono: "documento" },
+  { a: "/panel/pqr", texto: "Soporte", icono: "alerta" },
+];
+
+const privadosDe = (rol) =>
+  rol === "cliente" ? PRIVADOS_CLIENTE : PRIVADOS_PERSONAL;
 
 /** Ruta del panel que corresponde a cada rol. */
 const PANEL_POR_ROL = {
@@ -239,7 +257,7 @@ function Header() {
                 className="my-2 h-px shrink-0 bg-linea"
                 style={{ marginInline: 16 }}
               />
-              {PRIVADOS.map((enlace) => (
+              {privadosDe(rol).map((enlace) => (
                 <FilaRail key={enlace.a} a={enlace.a} icono={enlace.icono}>
                   {enlace.texto}
                 </FilaRail>
@@ -454,7 +472,7 @@ function Header() {
                   tienen que estar tambien aqui o quedan sin ninguna via de
                   acceso salvo escribir la URL. */}
               {autenticado &&
-                PRIVADOS.map((enlace) => (
+                privadosDe(rol).map((enlace) => (
                   <li key={enlace.a}>
                     <Link
                       to={enlace.a}

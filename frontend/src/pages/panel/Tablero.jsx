@@ -81,6 +81,11 @@ function Tablero() {
     }
   };
 
+  // El titulo dice lo mismo que el rail. Si el menu lleva a «Mi resumen» y
+  // la pagina se titula «Mis compras», parecen dos sitios distintos y uno de
+  // los dos esta mal.
+  const titulo = esPersonal ? "Ventas del negocio" : "Mi resumen";
+
   const serie = (reporte?.porDia ?? []).map((d) => ({
     etiqueta: fechaCorta(d.fecha),
     corta: diaMes(d.fecha),
@@ -90,7 +95,7 @@ function Tablero() {
   return (
     <PanelLayout
       etiqueta="Tablero"
-      titulo={esPersonal ? "Ventas del negocio" : "Mis compras"}
+      titulo={titulo}
       descripcion={
         esPersonal
           ? "Cifras del periodo, movimiento diario y lo que más se vende. El mismo reporte se descarga en PDF para imprimir o en Excel para analizar."

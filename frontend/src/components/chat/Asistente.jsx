@@ -129,7 +129,7 @@ function Conversador() {
         aria-expanded={abierto}
         aria-controls="panel-asistente"
         aria-label={abierto ? "Cerrar el asistente" : "Abrir el asistente"}
-        className="cristal cristal-vivo fixed bottom-24 right-5 z-50 inline-flex h-14 w-14
+        className="cristal cristal-asistente cristal-vivo fixed bottom-24 right-5 z-50 inline-flex h-14 w-14
                    items-center justify-center text-hueso transition-transform
                    hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-3
                    focus-visible:outline-accion-claro motion-reduce:transition-none
@@ -142,7 +142,7 @@ function Conversador() {
         <section
           id="panel-asistente"
           aria-label="Asistente de AutoPrime"
-          className="cristal fixed bottom-42 left-4 right-4 z-50 flex max-h-[62vh] flex-col
+          className="cristal cristal-asistente fixed bottom-42 left-4 right-4 z-50 flex max-h-[62vh] flex-col
                      overflow-hidden sm:left-auto sm:right-8 sm:w-[400px]"
         >
           <header className="flex items-start justify-between gap-4 border-b border-linea p-5">

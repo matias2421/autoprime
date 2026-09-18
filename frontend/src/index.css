@@ -402,6 +402,26 @@
    * Desplegado gana cuerpo, entonces. Plegado sigue siendo cristal, que es
    * donde la transparencia aporta y donde apenas tapa nada.
    */
+  /* El panel del asistente.
+   *
+   * `.cristal` esta al 55 %, que va bien para una tarjeta apoyada sobre un
+   * fondo liso. El chat no lo esta: flota sobre lo que haya detras -las fotos
+   * del catalogo, una tabla del panel- y encima hay que LEERLO. A ese nivel
+   * de transparencia, el texto de las respuestas competia con lo de debajo.
+   *
+   * Va sobre `--color-negro` y no sobre `--color-grafito` a proposito: las
+   * burbujas del asistente son de grafito, y con el panel del mismo color
+   * dejarian de distinguirse del fondo.
+   *
+   * El desenfoque sube a 30 px, como el del rail desplegado: cuanto mas opaca
+   * es la superficie, mas raro se ve el fondo nitido asomando por los bordes.
+   */
+  .cristal-asistente {
+    background: color-mix(in oklab, var(--color-negro) 96%, transparent);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+  }
+
   .rail-lateral:hover,
   .rail-lateral:focus-within {
     background: color-mix(in oklab, var(--color-negro) 94%, transparent);

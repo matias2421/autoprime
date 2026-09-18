@@ -105,6 +105,18 @@ class VentaYaFacturada(ConflictoDeNegocio):
         super().__init__(f"La venta {numero} ya tiene factura emitida.")
 
 
+class VentaConFactura(ConflictoDeNegocio):
+    """Se intentó borrar una venta que ya tiene factura."""
+
+    codigo = "venta_con_factura"
+
+    def __init__(self, numero: str, factura: str):
+        super().__init__(
+            f"La venta {numero} ya tiene la factura {factura} y no puede "
+            "eliminarse. Anúlala en su lugar para conservar el histórico."
+        )
+
+
 class VentaNoFacturable(ConflictoDeNegocio):
     codigo = "venta_no_facturable"
 

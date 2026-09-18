@@ -21,11 +21,11 @@ from sqlalchemy import (
     Text,
     Time,
     UniqueConstraint,
-    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.base_datos import Base
+from app.core.tiempo import ahora
 
 TIPOS_DOCUMENTO = ("CC", "TI", "CE", "PA", "NIT")
 ESTADOS_CUENTA = ("activo", "inactivo")
@@ -77,9 +77,14 @@ class Usuario(Base):
 
     rol_id: Mapped[int] = mapped_column(ForeignKey("roles.id"))
     estado: Mapped[str] = mapped_column(Enum(*ESTADOS_CUENTA), default="activo")
-    creado_en: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    # La marca de tiempo la pone la aplicacion con el reloj del negocio,
+    # no MySQL con el suyo: el servidor de la base corre en UTC y fechaba
+    # al dia siguiente todo lo ocurrido despues de las 7 de la tarde.
+    # Ver `app/core/tiempo.py`.
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
     actualizado_en: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), onupdate=func.now()
+        DateTime, default=ahora, onupdate=ahora
     )
 
     rol: Mapped["Rol"] = relationship(back_populates="usuarios", lazy="joined")
@@ -116,7 +121,7 @@ class Producto(Base):
     transmision: Mapped[str] = mapped_column(String(40))
     traccion: Mapped[str] = mapped_column(String(20))
     estado: Mapped[str] = mapped_column(Enum(*ESTADOS_PRODUCTO), default="disponible")
-    creado_en: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
 
 class Servicio(Base):
@@ -149,7 +154,7 @@ class Cita(Base):
     hora: Mapped[time] = mapped_column(Time)
     estado: Mapped[str] = mapped_column(Enum(*ESTADOS_CITA), default="pendiente")
     notas: Mapped[str | None] = mapped_column(String(300), nullable=True)
-    creado_en: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
     # Se carga con la cita, como sus hermanas. En asincrono una carga
     # perezosa no puede resolverse sola: al tocar `cita.usuario` fuera
@@ -179,14 +184,14 @@ class Venta(Base):
     vendedor_id: Mapped[int | None] = mapped_column(
         ForeignKey("usuarios.id"), nullable=True
     )
-    fecha: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    fecha: Mapped[datetime] = mapped_column(DateTime, default=ahora)
     subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     descuento: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     impuestos: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     total: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     estado: Mapped[str] = mapped_column(Enum(*ESTADOS_VENTA), default="pendiente")
     notas: Mapped[str | None] = mapped_column(String(300), nullable=True)
-    creado_en: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
     # `selectin` y no `joined`: en una relación de uno a muchos el join
     # repite la fila de la venta por cada línea y luego hay que deduplicar.
@@ -238,13 +243,13 @@ class Factura(Base):
     numero: Mapped[str] = mapped_column(String(20), unique=True)
     venta_id: Mapped[int] = mapped_column(ForeignKey("ventas.id"), unique=True)
     fecha_emision: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now()
+        DateTime, default=ahora
     )
     subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     impuestos: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     total: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     estado: Mapped[str] = mapped_column(Enum(*ESTADOS_FACTURA), default="emitida")
-    creado_en: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
     venta: Mapped["Venta"] = relationship(back_populates="factura", lazy="joined")
     lineas: Mapped[list["DetalleFactura"]] = relationship(
@@ -288,9 +293,9 @@ class Pqr(Base):
     atendido_por: Mapped[int | None] = mapped_column(
         ForeignKey("usuarios.id"), nullable=True
     )
-    creado_en: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
     actualizado_en: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), onupdate=func.now()
+        DateTime, default=ahora, onupdate=ahora
     )
 
     autor: Mapped["Usuario"] = relationship(foreign_keys=[usuario_id], lazy="joined")
@@ -313,9 +318,9 @@ class Conversacion(Base):
         ForeignKey("usuarios.id"), nullable=True
     )
     titulo: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    creado_en: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
     ultima_actividad: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), onupdate=func.now()
+        DateTime, default=ahora, onupdate=ahora
     )
 
     mensajes: Mapped[list["Mensaje"]] = relationship(
@@ -333,6 +338,6 @@ class Mensaje(Base):
     conversacion_id: Mapped[int] = mapped_column(ForeignKey("conversaciones.id"))
     rol: Mapped[str] = mapped_column(Enum(*ROLES_MENSAJE))
     contenido: Mapped[str] = mapped_column(Text)
-    creado_en: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora)
 
     conversacion: Mapped["Conversacion"] = relationship(back_populates="mensajes")

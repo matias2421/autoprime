@@ -1,10 +1,11 @@
 """Acceso a datos de las citas del taller."""
 
-from datetime import date, datetime, time, timedelta
+from datetime import date, time
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.tiempo import ahora
 from app.errores import CitaNoModificable, FranjaOcupada, RecursoNoEncontrado
 from app.models.autoprime import Cita
 
@@ -72,14 +73,16 @@ async def _franja_ocupada(
 
 async def franjas_de(sesion: AsyncSession, fecha: date, producto_id: int | None) -> list[dict]:
     """Devuelve las franjas del día marcando cuáles siguen libres."""
-    ahora = datetime.now()
+    # El reloj del negocio, no el del servidor: en Render el contenedor va
+    # en UTC y ofreceria franjas de un dia que en Colombia aun no empieza.
+    instante = ahora()
     salida = []
 
     for franja in FRANJAS:
         libre = not await _franja_ocupada(sesion, fecha, franja, producto_id)
 
         # Una hora que ya pasó hoy no se ofrece aunque nadie la haya tomado.
-        if fecha == ahora.date() and franja <= ahora.time():
+        if fecha == instante.date() and franja <= instante.time():
             libre = False
 
         salida.append({"hora": franja.strftime("%H:%M"), "disponible": libre})

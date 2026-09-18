@@ -27,3 +27,20 @@ python-dotenv==1.2.3
 
 # Formularios del login OAuth2 que usa la documentacion de Swagger.
 python-multipart==0.0.32
+
+# --- Quinto avance ---
+
+# Reportes. reportlab y XlsxWriter son Python puro: no arrastran librerias
+# del sistema, que es lo que descarta a WeasyPrint aqui. El contenedor de
+# Render no trae ni Chrome ni cairo, asi que un generador que dependiera de
+# ellos funcionaria en el portatil y fallaria en produccion.
+reportlab==5.0.1
+XlsxWriter==3.2.9
+
+# Cliente HTTP asincrono: habla con Groq y con el calendario de festivos sin
+# bloquear el bucle de eventos, que es justo lo que se gano al pasar a async.
+httpx==0.28.1
+
+# Pruebas.
+pytest==9.1.1
+pytest-asyncio==1.4.0

@@ -4,6 +4,7 @@ from datetime import date, datetime, time, timedelta
 
 from pydantic import Field, field_validator
 
+from app.core.tiempo import hoy as hoy_en_colombia
 from app.schemas.comunes import Esquema, EstadoCita
 
 # Reglas de agenda, las mismas que ya aplicaba el formulario.
@@ -14,7 +15,7 @@ HORA_CIERRE = time(18, 0)
 
 def _comprobar_fecha(valor: date) -> date:
     """Reglas de agenda, compartidas por el alta y la reprogramacion."""
-    hoy = date.today()
+    hoy = hoy_en_colombia()
     if valor < hoy:
         raise ValueError("No puedes agendar en una fecha pasada.")
     # weekday(): el domingo es 6

@@ -10,12 +10,13 @@ El consecutivo se saca del id, por lo mismo que en `ventas`: dos emisiones
 simultáneas que leyeran `MAX(numero)` pedirían el mismo número.
 """
 
-from datetime import date, datetime
+from datetime import date
 from uuid import uuid4
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.tiempo import fin_del_dia, hoy, inicio_del_dia
 from app.errores import RecursoNoEncontrado, VentaNoFacturable, VentaYaFacturada
 from app.models.autoprime import DetalleFactura, Factura, Venta
 
@@ -59,11 +60,11 @@ def _filtrar(
         consulta = consulta.where(Factura.estado == estado)
     if desde:
         consulta = consulta.where(
-            Factura.fecha_emision >= datetime.combine(desde, datetime.min.time())
+            Factura.fecha_emision >= inicio_del_dia(desde)
         )
     if hasta:
         consulta = consulta.where(
-            Factura.fecha_emision <= datetime.combine(hasta, datetime.max.time())
+            Factura.fecha_emision <= fin_del_dia(hasta)
         )
     return consulta
 
@@ -124,7 +125,7 @@ async def emitir(sesion: AsyncSession, venta: Venta) -> Factura:
     sesion.add(factura)
 
     await sesion.flush()
-    factura.numero = f"F-{date.today().year}-{factura.id:05d}"
+    factura.numero = f"F-{hoy().year}-{factura.id:05d}"
     await sesion.commit()
 
     await sesion.refresh(factura)

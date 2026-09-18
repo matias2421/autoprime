@@ -32,6 +32,7 @@ from app.routers import (
     citas,
     facturas,
     productos,
+    reportes,
     servicios,
     usuarios,
     ventas,
@@ -51,6 +52,7 @@ TAGS = [
     {"name": "Citas", "description": "Agenda de visitas y pruebas."},
     {"name": "Ventas", "description": "Registro de ventas y su detalle."},
     {"name": "Facturas", "description": "Emisión y consulta de facturas."},
+    {"name": "Reportes", "description": "Tableros y descargas en PDF y Excel."},
     {"name": "Sistema", "description": "Estado del servicio."},
 ]
 
@@ -263,6 +265,7 @@ app.include_router(servicios.router)
 app.include_router(citas.router)
 app.include_router(ventas.router)
 app.include_router(facturas.router)
+app.include_router(reportes.router)
 
 
 @app.get("/", tags=["Sistema"], summary="Presentación de la API")
@@ -280,6 +283,7 @@ async def raiz():
             "citas": "/api/citas",
             "ventas": "/api/ventas",
             "facturas": "/api/facturas",
+            "reportes": "/api/reportes",
         },
     }
 

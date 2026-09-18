@@ -1,13 +1,12 @@
 """Facturación.
 
 Emitir es cosa del personal; consultar y descargar, también del cliente, pero
-solo lo suyo. La descarga en PDF vive en el router de reportes, que es donde
-está el generador de documentos.
+solo lo suyo.
 """
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.crud import facturas as crud_facturas
 from app.dependencias import (
@@ -26,6 +25,7 @@ from app.documentacion import (
     respuestas,
 )
 from app.errores import PermisoDenegado
+from app.reportes.pdf import factura_pdf
 from app.schemas.comunes import EstadoFactura
 from app.schemas.factura import FacturaSalida
 from app.schemas.paginacion import PaginaDep
@@ -126,4 +126,36 @@ async def anular(factura: FacturaRuta, sesion: SesionDep, _: Personal) -> SobreF
         factura=FacturaSalida.desde_modelo(
             await crud_facturas.anular(sesion, factura)
         )
+    )
+
+
+@router.get(
+    "/{factura_id}/pdf",
+    summary="Descargar la factura en PDF",
+    response_class=Response,
+    responses=respuestas(
+        NO_ENCONTRADO,
+        {
+            200: {
+                "content": {"application/pdf": {}},
+                "description": "La factura lista para imprimir o archivar",
+            }
+        },
+    ),
+)
+async def descargar(factura: FacturaRuta, usuario: UsuarioActual) -> Response:
+    """El cliente descarga la suya; el personal, cualquiera.
+
+    El PDF se arma en memoria y se devuelve en la misma respuesta: guardarlo
+    en disco obligaria a decidir donde, a limpiarlo despues y a confiar en un
+    disco que en Render es efimero y desaparece con cada despliegue.
+    """
+    _exigir_acceso(usuario, factura)
+    return Response(
+        content=factura_pdf(factura),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{factura.numero}.pdf"',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
     )

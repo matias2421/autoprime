@@ -16,17 +16,19 @@ Dos decisiones que conviene leer antes que el código:
    nadie: solo existe entre el INSERT y el COMMIT.
 """
 
-from datetime import date, datetime
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import uuid4
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.tiempo import fin_del_dia, hoy, inicio_del_dia
 from app.errores import (
     PrecioBajoConsulta,
     RecursoNoEncontrado,
     VehiculoNoDisponible,
+    VentaConFactura,
     VentaNoModificable,
 )
 from app.models.autoprime import DetalleVenta, Producto, Servicio, Venta
@@ -81,11 +83,11 @@ def _filtrar(
         consulta = consulta.where(Venta.estado == estado)
     if desde:
         consulta = consulta.where(
-            Venta.fecha >= datetime.combine(desde, datetime.min.time())
+            Venta.fecha >= inicio_del_dia(desde)
         )
     if hasta:
         consulta = consulta.where(
-            Venta.fecha <= datetime.combine(hasta, datetime.max.time())
+            Venta.fecha <= fin_del_dia(hasta)
         )
     return consulta
 
@@ -226,7 +228,7 @@ async def crear(
             producto.estado = "vendido"
 
     await sesion.flush()  # aquí la base asigna el id
-    venta.numero = f"V-{date.today().year}-{venta.id:05d}"
+    venta.numero = f"V-{hoy().year}-{venta.id:05d}"
     await sesion.commit()
 
     await sesion.refresh(venta)
@@ -263,7 +265,17 @@ async def actualizar_notas(
 
 
 async def eliminar(sesion: AsyncSession, venta: Venta) -> None:
-    """Borra la venta y devuelve sus vehículos al catálogo."""
+    """Borra la venta y devuelve sus vehículos al catálogo.
+
+    Una venta ya facturada no se borra. La factura consumió un número del
+    consecutivo, y un consecutivo con huecos no sirve para lo único que hace
+    falta: demostrar que no falta ninguna. Sin esta comprobación el borrado
+    tampoco funcionaría —la clave ajena de `facturas` lo impide—, pero
+    fallaría con un error de la base en vez de con una explicación.
+    """
+    if venta.factura is not None:
+        raise VentaConFactura(venta.numero, venta.factura.numero)
+
     for linea in venta.lineas:
         if linea.producto_id:
             producto = await sesion.get(Producto, linea.producto_id)

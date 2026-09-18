@@ -28,7 +28,9 @@ RAIZ = os.path.dirname(os.path.abspath(__file__))
 ESQUEMA = os.path.join(RAIZ, "sql", "autoprime.sql")
 
 # En el orden en que hay que vaciarlas, aunque se desactiven las claves ajenas.
-TABLAS = ["citas", "rol_permiso", "usuarios", "productos", "servicios",
+TABLAS = ["mensajes", "conversaciones", "pqr", "detalle_facturas",
+          "facturas", "detalle_ventas", "ventas",
+          "citas", "rol_permiso", "usuarios", "productos", "servicios",
           "permisos", "roles"]
 
 USUARIOS = [

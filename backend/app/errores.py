@@ -70,6 +70,72 @@ class CitaNoModificable(ConflictoDeNegocio):
         super().__init__(f"Una cita en estado '{estado}' ya no admite cambios.")
 
 
+class VehiculoNoDisponible(ConflictoDeNegocio):
+    codigo = "vehiculo_no_disponible"
+
+    def __init__(self, descripcion: str, estado: str):
+        super().__init__(
+            f"El vehículo {descripcion} ya no está disponible (estado '{estado}')."
+        )
+
+
+class PrecioBajoConsulta(ConflictoDeNegocio):
+    """Pieza sin precio de lista: la cifra la pone un asesor, no el catálogo."""
+
+    codigo = "precio_bajo_consulta"
+
+    def __init__(self, descripcion: str):
+        super().__init__(
+            f"{descripcion} se vende bajo consulta: agenda una cotización con "
+            "un asesor para recibir el precio."
+        )
+
+
+class VentaNoModificable(ConflictoDeNegocio):
+    codigo = "venta_no_modificable"
+
+    def __init__(self, estado: str):
+        super().__init__(f"Una venta en estado '{estado}' ya no admite cambios.")
+
+
+class VentaYaFacturada(ConflictoDeNegocio):
+    codigo = "venta_ya_facturada"
+
+    def __init__(self, numero: str):
+        super().__init__(f"La venta {numero} ya tiene factura emitida.")
+
+
+class VentaNoFacturable(ConflictoDeNegocio):
+    codigo = "venta_no_facturable"
+
+    def __init__(self, estado: str):
+        super().__init__(f"No se factura una venta en estado '{estado}'.")
+
+
+class PqrNoModificable(ConflictoDeNegocio):
+    codigo = "pqr_no_modificable"
+
+    def __init__(self, estado: str):
+        super().__init__(f"Una PQR en estado '{estado}' ya está cerrada.")
+
+
+class ServicioExternoCaido(ErrorDeDominio):
+    """Un proveedor de fuera no respondió o respondió mal. → 503
+
+    Se distingue de un fallo propio a conciencia: quien llama necesita saber
+    que el problema está afuera y que reintentar puede servir.
+    """
+
+    codigo = "servicio_externo_caido"
+
+    def __init__(self, servicio: str, motivo: str = ""):
+        self.servicio = servicio
+        detalle = f" ({motivo})" if motivo else ""
+        super().__init__(
+            f"El servicio de {servicio} no está respondiendo{detalle}. "
+            "Inténtalo de nuevo en unos minutos."
+        )
+
 # --- Autenticación y autorización ---
 class NoAutenticado(ErrorDeDominio):
     """No se pudo establecer la identidad del solicitante. → 401"""

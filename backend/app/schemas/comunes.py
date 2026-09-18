@@ -5,9 +5,17 @@ aquí se expresan una sola vez y Pydantic las hace cumplir en cada entrada.
 """
 
 import re
+from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PlainSerializer,
+    StringConstraints,
+    field_validator,
+)
 from pydantic.alias_generators import to_camel
 
 class Esquema(BaseModel):
@@ -36,6 +44,22 @@ EstadoProducto = Literal["disponible", "vendido", "inactivo"]
 Familia = Literal["gama", "edicion", "coleccion"]
 EstadoCita = Literal["pendiente", "confirmada", "cancelada", "completada"]
 NombreRol = Literal["administrador", "empleado", "cliente"]
+EstadoVenta = Literal["pendiente", "pagada", "anulada"]
+EstadoFactura = Literal["emitida", "anulada"]
+TipoPqr = Literal["peticion", "queja", "reclamo", "sugerencia"]
+EstadoPqr = Literal["pendiente", "en_proceso", "respondida", "cerrada"]
+RolMensaje = Literal["usuario", "asistente"]
+
+# --- Dinero ---
+#
+# En la base es DECIMAL, porque sumar flotantes acumula error y una suma
+# de importes tiene que cuadrar al céntimo. Pero al salir en JSON Pydantic
+# convertiría el Decimal en cadena ("119000.00"), y entonces el frontend
+# tendría que convertir cada importe antes de poder formatearlo o sumarlo.
+# Así que se guarda exacto y se entrega como número.
+Dinero = Annotated[
+    Decimal, PlainSerializer(float, return_type=float, when_used="json")
+]
 
 # --- Cadenas con forma ---
 Texto = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]

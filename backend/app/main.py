@@ -6,12 +6,13 @@ frontend en React apenas cambia.
 """
 
 import logging
+import uuid
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.core.base_datos import comprobar_conexion
 from app.core.configuracion import configuracion
@@ -22,10 +23,19 @@ from app.errores import (
     NoAutenticado,
     PermisoDenegado,
     RecursoNoEncontrado,
+    ServicioExternoCaido,
 )
 from app.dependencias import SesionDep
 from app.models import autoprime  # noqa: F401 — registra las tablas en Base
-from app.routers import auth, citas, productos, servicios, usuarios
+from app.routers import (
+    auth,
+    citas,
+    facturas,
+    productos,
+    servicios,
+    usuarios,
+    ventas,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,6 +49,8 @@ TAGS = [
     {"name": "Productos", "description": "Catálogo de vehículos."},
     {"name": "Servicios", "description": "Servicios que ofrece el taller."},
     {"name": "Citas", "description": "Agenda de visitas y pruebas."},
+    {"name": "Ventas", "description": "Registro de ventas y su detalle."},
+    {"name": "Facturas", "description": "Emisión y consulta de facturas."},
     {"name": "Sistema", "description": "Estado del servicio."},
 ]
 
@@ -72,7 +84,9 @@ app.add_middleware(
 # estable, y muestra `mensaje`, que está redactado para leerse.
 
 
-def _respuesta(estado: int, codigo: str, mensaje: str, ruta: str, detalles=None):
+def _respuesta(
+    estado: int, codigo: str, mensaje: str, ruta: str, detalles=None, cabeceras=None
+):
     return JSONResponse(
         status_code=estado,
         content={
@@ -81,6 +95,7 @@ def _respuesta(estado: int, codigo: str, mensaje: str, ruta: str, detalles=None)
             "ruta": ruta,
             "detalles": detalles,
         },
+        headers=cabeceras,
     )
 
 
@@ -100,8 +115,19 @@ def _conflicto(peticion: Request, error: ConflictoDeNegocio):
 
 @app.exception_handler(NoAutenticado)
 def _no_autenticado(peticion: Request, error: NoAutenticado):
+    """El 401 lleva `WWW-Authenticate`, que es lo que lo distingue del 403.
+
+    Sin esa cabecera, un 401 es solo un número: la norma HTTP dice que una
+    respuesta 401 tiene que indicar con qué esquema autenticarse, y es lo que
+    permite a un cliente genérico —Postman, un `curl`, la propia página de
+    `/docs`— saber que debe pedir un token en vez de rendirse.
+    """
     return _respuesta(
-        status.HTTP_401_UNAUTHORIZED, error.codigo, error.mensaje, peticion.url.path
+        status.HTTP_401_UNAUTHORIZED,
+        error.codigo,
+        error.mensaje,
+        peticion.url.path,
+        cabeceras={"WWW-Authenticate": "Bearer"},
     )
 
 
@@ -153,14 +179,77 @@ def _validacion(peticion: Request, error: RequestValidationError):
     )
 
 
+@app.exception_handler(ServicioExternoCaido)
+def _servicio_externo(peticion: Request, error: ServicioExternoCaido):
+    """503, no 500: el fallo no es nuestro y reintentar puede funcionar."""
+    logger.warning("Proveedor externo sin responder: %s", error.servicio)
+    return _respuesta(
+        status.HTTP_503_SERVICE_UNAVAILABLE,
+        error.codigo,
+        error.mensaje,
+        peticion.url.path,
+    )
+
+
+@app.exception_handler(IntegrityError)
+def _integridad(peticion: Request, error: IntegrityError):
+    """Una restricción de la base rechazó la escritura. → 409, no 500.
+
+    Es un conflicto de datos —un correo repetido, un consecutivo que ya
+    existe—, no una avería: el 500 le diría al cliente que el fallo es del
+    servidor y que no tiene sentido cambiar nada, cuando es justo al revés.
+
+    El texto del error de MySQL no sale: nombra la tabla y el índice, y eso
+    es el esquema. Queda en el log, que es donde hace falta.
+    """
+    logger.warning("Integridad rechazada en %s: %s", peticion.url.path, error.orig)
+    return _respuesta(
+        status.HTTP_409_CONFLICT,
+        "conflicto_de_integridad",
+        "Los datos chocan con un registro que ya existe.",
+        peticion.url.path,
+    )
+
+
 @app.exception_handler(SQLAlchemyError)
 def _error_base_datos(peticion: Request, error: SQLAlchemyError):
     """No se filtra el detalle del error de SQL: puede revelar el esquema."""
-    logger.error("Error de base de datos en %s: %s", peticion.url.path, error)
+    logger.error(
+        "Error de base de datos en %s: %s", peticion.url.path, error, exc_info=True
+    )
     return _respuesta(
         status.HTTP_500_INTERNAL_SERVER_ERROR,
         "error_base_datos",
         "No se pudo completar la operación en la base de datos.",
+        peticion.url.path,
+    )
+
+
+@app.exception_handler(Exception)
+def _fallo_inesperado(peticion: Request, error: Exception):
+    """Lo que nadie previó. El cliente recibe poco; el log, todo.
+
+    Sin este manejador, una excepción sin capturar sale con el formato de
+    Starlette y no con el de la API, así que el frontend —que lee `codigo`—
+    se encuentra un cuerpo que no sabe interpretar justo en el peor momento.
+
+    La traza va al log con `exc_info`, no al cuerpo: un rastro de pila dice
+    rutas del servidor, versiones y a veces datos de la petición. Y va con
+    un identificador que sí se le entrega a quien llama, para que pueda
+    decir «me falló la operación 7f3a…» y eso baste para encontrar el caso
+    exacto en el log sin adivinar por la hora.
+    """
+    referencia = uuid.uuid4().hex[:8]
+    logger.exception(
+        "Fallo no controlado [%s] en %s %s",
+        referencia,
+        peticion.method,
+        peticion.url.path,
+    )
+    return _respuesta(
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+        "error_interno",
+        f"Ocurrió un error inesperado. Referencia: {referencia}.",
         peticion.url.path,
     )
 
@@ -172,6 +261,8 @@ app.include_router(usuarios.router)
 app.include_router(productos.router)
 app.include_router(servicios.router)
 app.include_router(citas.router)
+app.include_router(ventas.router)
+app.include_router(facturas.router)
 
 
 @app.get("/", tags=["Sistema"], summary="Presentación de la API")
@@ -187,6 +278,8 @@ async def raiz():
             "productos": "/api/productos",
             "servicios": "/api/servicios",
             "citas": "/api/citas",
+            "ventas": "/api/ventas",
+            "facturas": "/api/facturas",
         },
     }
 

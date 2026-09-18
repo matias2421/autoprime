@@ -127,6 +127,154 @@ CREATE TABLE citas (
   CONSTRAINT uq_cupo UNIQUE (fecha, hora, producto_id)
 ) ENGINE=InnoDB;
 
+-- =============================================================================
+--  Quinto avance: gestion comercial, PQR y chatbot
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- ventas
+--
+-- `numero` es el correlativo que ve la gente ("V-2026-0001"). Se guarda aparte
+-- del id porque el id es un detalle de la base y este no: aparece en la factura,
+-- en el reporte y en cualquier reclamo, asi que no puede cambiar ni saltarse.
+--
+-- `vendedor_id` admite nulo: una compra hecha desde la web no la registra
+-- ningun empleado.
+-- -----------------------------------------------------------------------------
+CREATE TABLE ventas (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  numero      VARCHAR(20)   NOT NULL UNIQUE,
+  usuario_id  INT           NOT NULL,
+  vendedor_id INT           NULL,
+  fecha       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  subtotal    DECIMAL(14,2) NOT NULL DEFAULT 0,
+  descuento   DECIMAL(14,2) NOT NULL DEFAULT 0,
+  impuestos   DECIMAL(14,2) NOT NULL DEFAULT 0,
+  total       DECIMAL(14,2) NOT NULL DEFAULT 0,
+  estado      ENUM('pendiente','pagada','anulada')
+                NOT NULL DEFAULT 'pendiente',
+  notas       VARCHAR(300)  NULL,
+  creado_en   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_venta_cliente  FOREIGN KEY (usuario_id)  REFERENCES usuarios(id),
+  CONSTRAINT fk_venta_vendedor FOREIGN KEY (vendedor_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+  INDEX ix_venta_fecha  (fecha),
+  INDEX ix_venta_estado (estado)
+) ENGINE=InnoDB;
+
+-- -----------------------------------------------------------------------------
+-- detalle_ventas
+--
+-- Cada linea guarda una COPIA de la descripcion y del precio, no solo la clave
+-- ajena. Los precios del catalogo cambian, y una venta de hace tres meses tiene
+-- que seguir diciendo lo que se cobro entonces; si el detalle mirase el precio
+-- actual del producto, el historico se reescribiria solo.
+--
+-- Producto y servicio admiten nulo porque una linea es lo uno o lo otro. La
+-- comprobacion de que llegue exactamente uno se hace en los esquemas de
+-- Pydantic, donde el mensaje de error puede explicarse.
+-- -----------------------------------------------------------------------------
+CREATE TABLE detalle_ventas (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  venta_id        INT           NOT NULL,
+  producto_id     INT           NULL,
+  servicio_id     INT           NULL,
+  descripcion     VARCHAR(160)  NOT NULL,
+  cantidad        INT           NOT NULL DEFAULT 1,
+  precio_unitario DECIMAL(14,2) NOT NULL,
+  descuento       DECIMAL(14,2) NOT NULL DEFAULT 0,
+  subtotal        DECIMAL(14,2) NOT NULL,
+  CONSTRAINT fk_detalle_venta    FOREIGN KEY (venta_id)    REFERENCES ventas(id) ON DELETE CASCADE,
+  CONSTRAINT fk_detalle_producto FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL,
+  CONSTRAINT fk_detalle_servicio FOREIGN KEY (servicio_id) REFERENCES servicios(id) ON DELETE SET NULL,
+  INDEX ix_detalle_venta (venta_id)
+) ENGINE=InnoDB;
+
+-- -----------------------------------------------------------------------------
+-- facturas
+--
+-- Una venta tiene como mucho una factura, de ahi el UNIQUE sobre venta_id.
+-- -----------------------------------------------------------------------------
+CREATE TABLE facturas (
+  id            INT AUTO_INCREMENT PRIMARY KEY,
+  numero        VARCHAR(20)   NOT NULL UNIQUE,
+  venta_id      INT           NOT NULL UNIQUE,
+  fecha_emision DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  subtotal      DECIMAL(14,2) NOT NULL,
+  impuestos     DECIMAL(14,2) NOT NULL DEFAULT 0,
+  total         DECIMAL(14,2) NOT NULL,
+  estado        ENUM('emitida','anulada') NOT NULL DEFAULT 'emitida',
+  creado_en     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_factura_venta FOREIGN KEY (venta_id) REFERENCES ventas(id),
+  INDEX ix_factura_fecha (fecha_emision)
+) ENGINE=InnoDB;
+
+-- -----------------------------------------------------------------------------
+-- detalle_facturas
+--
+-- Repite el detalle de la venta a proposito. Una factura es un documento que,
+-- una vez emitido, dice lo que dice: si mañana se corrige una linea de la venta,
+-- la factura ya emitida no puede cambiar sola. Copiarlo es lo que permite
+-- corregir una cosa sin falsear la otra.
+-- -----------------------------------------------------------------------------
+CREATE TABLE detalle_facturas (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  factura_id      INT           NOT NULL,
+  descripcion     VARCHAR(160)  NOT NULL,
+  cantidad        INT           NOT NULL DEFAULT 1,
+  precio_unitario DECIMAL(14,2) NOT NULL,
+  subtotal        DECIMAL(14,2) NOT NULL,
+  CONSTRAINT fk_detfac_factura FOREIGN KEY (factura_id) REFERENCES facturas(id) ON DELETE CASCADE,
+  INDEX ix_detfac_factura (factura_id)
+) ENGINE=InnoDB;
+
+-- -----------------------------------------------------------------------------
+-- pqr  (peticiones, quejas y reclamos)
+-- -----------------------------------------------------------------------------
+CREATE TABLE pqr (
+  id            INT AUTO_INCREMENT PRIMARY KEY,
+  numero        VARCHAR(20)  NOT NULL UNIQUE,
+  usuario_id    INT          NOT NULL,
+  tipo          ENUM('peticion','queja','reclamo','sugerencia') NOT NULL,
+  asunto        VARCHAR(120) NOT NULL,
+  descripcion   VARCHAR(800) NOT NULL,
+  estado        ENUM('pendiente','en_proceso','respondida','cerrada')
+                  NOT NULL DEFAULT 'pendiente',
+  respuesta     VARCHAR(800) NULL,
+  atendido_por  INT          NULL,
+  creado_en     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_pqr_usuario  FOREIGN KEY (usuario_id)   REFERENCES usuarios(id) ON DELETE CASCADE,
+  CONSTRAINT fk_pqr_atendido FOREIGN KEY (atendido_por) REFERENCES usuarios(id) ON DELETE SET NULL,
+  INDEX ix_pqr_estado (estado)
+) ENGINE=InnoDB;
+
+-- -----------------------------------------------------------------------------
+-- conversaciones y mensajes  (chatbot)
+--
+-- `usuario_id` admite nulo porque el chat atiende tambien a quien todavia no
+-- tiene cuenta: es lo primero que ve un visitante, antes de registrarse.
+-- -----------------------------------------------------------------------------
+CREATE TABLE conversaciones (
+  id                INT AUTO_INCREMENT PRIMARY KEY,
+  usuario_id        INT       NULL,
+  titulo            VARCHAR(120) NULL,
+  creado_en         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ultima_actividad  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_conv_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+  INDEX ix_conv_usuario (usuario_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE mensajes (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  conversacion_id INT           NOT NULL,
+  rol             ENUM('usuario','asistente') NOT NULL,
+  contenido       TEXT          NOT NULL,
+  creado_en       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_mensaje_conv FOREIGN KEY (conversacion_id) REFERENCES conversaciones(id) ON DELETE CASCADE,
+  INDEX ix_mensaje_conv (conversacion_id)
+) ENGINE=InnoDB;
+
+
 CREATE INDEX idx_citas_usuario ON citas(usuario_id);
 CREATE INDEX idx_citas_fecha   ON citas(fecha);
 

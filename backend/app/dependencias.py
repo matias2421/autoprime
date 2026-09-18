@@ -14,11 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.base_datos import obtener_sesion
 from app.core.seguridad import TIPO_SESION, JWTError, decodificar_token
 from app.crud import citas as crud_citas
+from app.crud import facturas as crud_facturas
 from app.crud import productos as crud_productos
 from app.crud import servicios as crud_servicios
 from app.crud import usuarios as crud_usuarios
+from app.crud import ventas as crud_ventas
 from app.errores import NoAutenticado, PermisoDenegado
-from app.models.autoprime import Cita, Producto, Servicio, Usuario
+from app.models.autoprime import Cita, Factura, Producto, Servicio, Usuario, Venta
 
 # --- Sesión de base de datos ---
 SesionDep = Annotated[AsyncSession, Depends(obtener_sesion)]
@@ -117,7 +119,21 @@ async def obtener_cita_ruta(
     return await crud_citas.obtener_o_fallar(sesion, cita_id)
 
 
+async def obtener_venta_ruta(
+    sesion: SesionDep, venta_id: Annotated[int, Path(ge=1)]
+) -> Venta:
+    return await crud_ventas.obtener_o_fallar(sesion, venta_id)
+
+
+async def obtener_factura_ruta(
+    sesion: SesionDep, factura_id: Annotated[int, Path(ge=1)]
+) -> Factura:
+    return await crud_facturas.obtener_o_fallar(sesion, factura_id)
+
+
 UsuarioRuta = Annotated[Usuario, Depends(obtener_usuario_ruta)]
 ProductoRuta = Annotated[Producto, Depends(obtener_producto_ruta)]
 ServicioRuta = Annotated[Servicio, Depends(obtener_servicio_ruta)]
 CitaRuta = Annotated[Cita, Depends(obtener_cita_ruta)]
+VentaRuta = Annotated[Venta, Depends(obtener_venta_ruta)]
+FacturaRuta = Annotated[Factura, Depends(obtener_factura_ruta)]

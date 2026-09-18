@@ -5,6 +5,7 @@ import Icono from "../components/ui/Icono";
 import Input from "../components/ui/Input";
 import Select from "../components/ui/Select";
 import { citasApi, productosApi, serviciosApi } from "../api/cliente";
+import { imagenDeVehiculo } from "../utils/imagenes";
 import { useAuth } from "../hooks/useAuth";
 
 /** Fecha de hoy en formato AAAA-MM-DD, en hora local (no UTC). */
@@ -377,17 +378,27 @@ function AgendarCita() {
                 <div className="border-b border-linea p-6 text-hueso">
                   <p className="etiqueta text-accion">{vehiculo.marca}</p>
                   <h2 className="display mt-1 text-3xl">{vehiculo.modelo}</h2>
-                  <img
-                    src={`/src/assets/images/${vehiculo.imagen}`}
-                    alt={vehiculo.titulo}
-                    width={1600}
-                    height={900}
-                    loading="lazy"
-                    className="mt-4 w-full object-contain"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
+                  {/*
+                    Aquí el vehículo llega de la API, así que `imagen` es el
+                    nombre que guarda la base y no una URL. Hay que traducirlo
+                    a la foto compilada; si no, no carga.
+
+                    Antes se armaba la ruta a mano apuntando a `/src/`, que
+                    existe mientras se desarrolla y desaparece al compilar. El
+                    `onError` que había escondía la imagen rota, de modo que el
+                    fallo no se veía: el panel salía con sus datos y sin foto,
+                    como si fuera así a propósito.
+                  */}
+                  {imagenDeVehiculo(vehiculo.imagen) && (
+                    <img
+                      src={imagenDeVehiculo(vehiculo.imagen)}
+                      alt={vehiculo.titulo}
+                      width={1600}
+                      height={900}
+                      loading="lazy"
+                      className="mt-4 w-full object-contain"
+                    />
+                  )}
                 </div>
                 <dl className="divide-y divide-linea">
                   {[

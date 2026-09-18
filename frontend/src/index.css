@@ -355,6 +355,26 @@
       0 18px 44px -30px rgb(0 0 0 / 0.7);
   }
 
+  /*
+   * Raíl lateral desplegado.
+   *
+   * Se apoya encima del contenido en lugar de empujarlo, para que ensancharlo
+   * no recalcule la maqueta. El precio es que tapa texto: a 1900 px de ancho
+   * se come entre 20 y 55 px del comienzo de once líneas. Con el 55 % de
+   * `.cristal` ese texto se transparenta y queda superpuesto al del menú, y
+   * dos textos encimados no se leen como un panel flotante sino como un fallo
+   * de dibujado.
+   *
+   * Desplegado gana cuerpo, entonces. Plegado sigue siendo cristal, que es
+   * donde la transparencia aporta y donde apenas tapa nada.
+   */
+  .rail-lateral:hover,
+  .rail-lateral:focus-within {
+    background: color-mix(in oklab, var(--color-negro) 94%, transparent);
+    backdrop-filter: blur(30px) saturate(185%);
+    -webkit-backdrop-filter: blur(30px) saturate(185%);
+  }
+
   /* Encima de fotografía a todo color hace falta más cuerpo. */
   .cristal-denso {
     background: color-mix(in oklab, var(--color-negro) 72%, transparent);

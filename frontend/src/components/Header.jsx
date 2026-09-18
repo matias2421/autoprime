@@ -159,9 +159,9 @@ function Header() {
            está plegado—, pero en vertical se desplaza: en una pantalla baja,
            al desplegar las familias el contenido crece y recortarlo dejaría
            fuera el idioma y la sesión, que son el pie del raíl. */
-        className="cristal group fixed inset-y-0 left-0 z-40 hidden w-[72px]
+        className="cristal rail-lateral group fixed inset-y-0 left-0 z-40 hidden w-[72px]
                    overflow-x-hidden overflow-y-auto border-y-0 border-l-0
-                   transition-[width] duration-300 ease-out
+                   transition-[width,background-color] duration-300 ease-out
                    hover:w-66 focus-within:w-66 lg:flex lg:flex-col"
       >
         {/* Marca */}

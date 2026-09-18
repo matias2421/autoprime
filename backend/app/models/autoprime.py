@@ -144,6 +144,12 @@ class Cita(Base):
     notas: Mapped[str | None] = mapped_column(String(300), nullable=True)
     creado_en: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    usuario: Mapped["Usuario"] = relationship(back_populates="citas")
+    # Se carga con la cita, como sus hermanas. En asincrono una carga
+    # perezosa no puede resolverse sola: al tocar `cita.usuario` fuera
+    # del contexto salta MissingGreenlet, y el mensaje no menciona ni
+    # la relacion ni el atributo que lo provoco.
+    usuario: Mapped["Usuario"] = relationship(
+        back_populates="citas", lazy="joined"
+    )
     producto: Mapped["Producto | None"] = relationship(lazy="joined")
     servicio: Mapped["Servicio"] = relationship(lazy="joined")

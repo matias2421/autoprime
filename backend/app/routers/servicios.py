@@ -12,11 +12,11 @@ router = APIRouter(prefix="/api/servicios", tags=["Servicios"])
 
 
 @router.get("", response_model=SobreServicios, summary="Listar servicios")
-def listar(sesion: SesionDep, estado: EstadoCuenta | None = None) -> SobreServicios:
+async def listar(sesion: SesionDep, estado: EstadoCuenta | None = None) -> SobreServicios:
     """Consulta pública: hace falta para el formulario de agendar cita."""
     salida = [
         ServicioSalida.model_validate(s)
-        for s in crud_servicios.listar(sesion, estado=estado)
+        for s in await crud_servicios.listar(sesion, estado=estado)
     ]
     return SobreServicios(servicios=salida, total=len(salida))
 
@@ -27,31 +27,31 @@ def listar(sesion: SesionDep, estado: EstadoCuenta | None = None) -> SobreServic
     status_code=status.HTTP_201_CREATED,
     summary="Crear un servicio",
 )
-def crear(datos: ServicioCrear, sesion: SesionDep, _: Personal) -> SobreServicio:
-    servicio = crud_servicios.crear(sesion, datos.model_dump())
+async def crear(datos: ServicioCrear, sesion: SesionDep, _: Personal) -> SobreServicio:
+    servicio = await crud_servicios.crear(sesion, datos.model_dump())
     return SobreServicio(servicio=ServicioSalida.model_validate(servicio))
 
 
 @router.get("/{servicio_id}", response_model=SobreServicio, summary="Consultar uno")
-def obtener(servicio: ServicioRuta) -> SobreServicio:
+async def obtener(servicio: ServicioRuta) -> SobreServicio:
     return SobreServicio(servicio=ServicioSalida.model_validate(servicio))
 
 
 @router.put("/{servicio_id}", response_model=SobreServicio, summary="Actualizar")
-def actualizar(
+async def actualizar(
     datos: ServicioActualizar,
     servicio: ServicioRuta,
     sesion: SesionDep,
     _: Personal,
 ) -> SobreServicio:
     cambios = datos.model_dump(exclude_unset=True)
-    actualizado = crud_servicios.actualizar(sesion, servicio, cambios)
+    actualizado = await crud_servicios.actualizar(sesion, servicio, cambios)
     return SobreServicio(servicio=ServicioSalida.model_validate(actualizado))
 
 
 @router.delete("/{servicio_id}", response_model=RespuestaSimple, summary="Eliminar")
-def eliminar(
+async def eliminar(
     servicio: ServicioRuta, sesion: SesionDep, _: SoloAdmin
 ) -> RespuestaSimple:
-    crud_servicios.eliminar(sesion, servicio)
+    await crud_servicios.eliminar(sesion, servicio)
     return RespuestaSimple(mensaje="Servicio eliminado.")

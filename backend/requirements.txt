@@ -10,6 +10,9 @@ email-validator==2.3.0
 # Base de datos: SQLAlchemy sincrono sobre MySQL/MariaDB (XAMPP).
 SQLAlchemy==2.0.52
 PyMySQL==1.2.0
+# Driver asincrono para la API. PyMySQL se queda para los scripts de
+# linea de ordenes, que van en sincrono a proposito.
+aiomysql==0.3.2
 
 # Seguridad.
 # Se usa bcrypt directamente en lugar de passlib: passlib no recibe

@@ -1,46 +1,46 @@
 """Acceso a datos de los servicios del taller."""
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errores import RecursoNoEncontrado
 from app.models.autoprime import Servicio
 
 
-def obtener(sesion: Session, servicio_id: int) -> Servicio | None:
-    return sesion.get(Servicio, servicio_id)
+async def obtener(sesion: AsyncSession, servicio_id: int) -> Servicio | None:
+    return await sesion.get(Servicio, servicio_id)
 
 
-def obtener_o_fallar(sesion: Session, servicio_id: int) -> Servicio:
-    servicio = obtener(sesion, servicio_id)
+async def obtener_o_fallar(sesion: AsyncSession, servicio_id: int) -> Servicio:
+    servicio = await obtener(sesion, servicio_id)
     if servicio is None:
         raise RecursoNoEncontrado("un servicio", servicio_id)
     return servicio
 
 
-def listar(sesion: Session, estado: str | None = None) -> list[Servicio]:
+async def listar(sesion: AsyncSession, estado: str | None = None) -> list[Servicio]:
     consulta = select(Servicio)
     if estado:
         consulta = consulta.where(Servicio.estado == estado)
-    return list(sesion.scalars(consulta.order_by(Servicio.id)))
+    return list(await sesion.scalars(consulta.order_by(Servicio.id)))
 
 
-def crear(sesion: Session, datos: dict) -> Servicio:
+async def crear(sesion: AsyncSession, datos: dict) -> Servicio:
     servicio = Servicio(**datos)
     sesion.add(servicio)
-    sesion.commit()
-    sesion.refresh(servicio)
+    await sesion.commit()
+    await sesion.refresh(servicio)
     return servicio
 
 
-def actualizar(sesion: Session, servicio: Servicio, cambios: dict) -> Servicio:
+async def actualizar(sesion: AsyncSession, servicio: Servicio, cambios: dict) -> Servicio:
     for campo, valor in cambios.items():
         setattr(servicio, campo, valor)
-    sesion.commit()
-    sesion.refresh(servicio)
+    await sesion.commit()
+    await sesion.refresh(servicio)
     return servicio
 
 
-def eliminar(sesion: Session, servicio: Servicio) -> None:
-    sesion.delete(servicio)
-    sesion.commit()
+async def eliminar(sesion: AsyncSession, servicio: Servicio) -> None:
+    await sesion.delete(servicio)
+    await sesion.commit()

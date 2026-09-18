@@ -42,7 +42,7 @@ def _puede_ver(usuario, cita) -> bool:
     response_model=SobreDisponibilidad,
     summary="Franjas libres de un día",
 )
-def disponibilidad(
+async def disponibilidad(
     sesion: SesionDep,
     fecha: date,
     # El frontend envía `productoId`: los parámetros de consulta no pasan por
@@ -51,27 +51,27 @@ def disponibilidad(
 ) -> SobreDisponibilidad:
     """Consulta pública: el formulario la usa antes de pedir iniciar sesión."""
     horas = [
-        FranjaDisponible(**f) for f in crud_citas.franjas_de(sesion, fecha, producto_id)
+        FranjaDisponible(**f) for f in await crud_citas.franjas_de(sesion, fecha, producto_id)
     ]
     return SobreDisponibilidad(fecha=fecha.isoformat(), horas=horas)
 
 
 @router.get("/resumen", response_model=SobreResumen, summary="Contadores por estado")
-def resumen(sesion: SesionDep, usuario: UsuarioActual) -> SobreResumen:
+async def resumen(sesion: SesionDep, usuario: UsuarioActual) -> SobreResumen:
     """Un cliente ve el resumen de sus citas; el personal, el de todas."""
     solo_mias = None if _es_personal(usuario) else usuario.id
-    datos = crud_citas.resumen(sesion, usuario_id=solo_mias)
+    datos = await crud_citas.resumen(sesion, usuario_id=solo_mias)
     return SobreResumen(resumen=ResumenCitas(**datos))
 
 
 @router.get("", response_model=SobreCitas, summary="Listar citas")
-def listar(
+async def listar(
     sesion: SesionDep,
     usuario: UsuarioActual,
     estado: EstadoCita | None = None,
 ) -> SobreCitas:
     solo_mias = None if _es_personal(usuario) else usuario.id
-    citas = crud_citas.listar(sesion, usuario_id=solo_mias, estado=estado)
+    citas = await crud_citas.listar(sesion, usuario_id=solo_mias, estado=estado)
     salida = [CitaSalida.desde_modelo(c) for c in citas]
     return SobreCitas(citas=salida, total=len(salida))
 
@@ -82,21 +82,21 @@ def listar(
     status_code=status.HTTP_201_CREATED,
     summary="Agendar una cita",
 )
-def crear(datos: CitaCrear, sesion: SesionDep, usuario: UsuarioActual) -> SobreCita:
+async def crear(datos: CitaCrear, sesion: SesionDep, usuario: UsuarioActual) -> SobreCita:
     """El dueño de la cita sale del token, nunca del cuerpo de la petición."""
-    cita = crud_citas.crear(sesion, usuario.id, datos.model_dump())
+    cita = await crud_citas.crear(sesion, usuario.id, datos.model_dump())
     return SobreCita(cita=CitaSalida.desde_modelo(cita))
 
 
 @router.get("/{cita_id}", response_model=SobreCita, summary="Consultar una cita")
-def obtener(cita: CitaRuta, usuario: UsuarioActual) -> SobreCita:
+async def obtener(cita: CitaRuta, usuario: UsuarioActual) -> SobreCita:
     if not _puede_ver(usuario, cita):
         raise PermisoDenegado("Esa cita no te pertenece.")
     return SobreCita(cita=CitaSalida.desde_modelo(cita))
 
 
 @router.put("/{cita_id}", response_model=SobreCita, summary="Reprogramar")
-def actualizar(
+async def actualizar(
     datos: CitaActualizar,
     cita: CitaRuta,
     sesion: SesionDep,
@@ -105,11 +105,11 @@ def actualizar(
     if not _puede_ver(usuario, cita):
         raise PermisoDenegado("Esa cita no te pertenece.")
     cambios = datos.model_dump(exclude_unset=True)
-    return SobreCita(cita=CitaSalida.desde_modelo(crud_citas.actualizar(sesion, cita, cambios)))
+    return SobreCita(cita=CitaSalida.desde_modelo(await crud_citas.actualizar(sesion, cita, cambios)))
 
 
 @router.patch("/{cita_id}/estado", response_model=SobreCita, summary="Cambiar estado")
-def cambiar_estado(
+async def cambiar_estado(
     datos: CambioEstadoCita,
     cita: CitaRuta,
     sesion: SesionDep,
@@ -123,11 +123,11 @@ def cambiar_estado(
         if datos.estado != "cancelada":
             raise PermisoDenegado("Solo puedes cancelar tu cita.")
 
-    actualizada = crud_citas.cambiar_estado(sesion, cita, datos.estado)
+    actualizada = await crud_citas.cambiar_estado(sesion, cita, datos.estado)
     return SobreCita(cita=CitaSalida.desde_modelo(actualizada))
 
 
 @router.delete("/{cita_id}", response_model=RespuestaSimple, summary="Eliminar")
-def eliminar(cita: CitaRuta, sesion: SesionDep, _: Personal) -> RespuestaSimple:
-    crud_citas.eliminar(sesion, cita)
+async def eliminar(cita: CitaRuta, sesion: SesionDep, _: Personal) -> RespuestaSimple:
+    await crud_citas.eliminar(sesion, cita)
     return RespuestaSimple(mensaje="Cita eliminada.")

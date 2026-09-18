@@ -3,7 +3,7 @@
 from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errores import CitaNoModificable, FranjaOcupada, RecursoNoEncontrado
 from app.models.autoprime import Cita
@@ -15,19 +15,19 @@ FRANJAS = [time(h, 0) for h in range(8, 18)]
 ESTADOS_CERRADOS = ("cancelada", "completada")
 
 
-def obtener(sesion: Session, cita_id: int) -> Cita | None:
-    return sesion.get(Cita, cita_id)
+async def obtener(sesion: AsyncSession, cita_id: int) -> Cita | None:
+    return await sesion.get(Cita, cita_id)
 
 
-def obtener_o_fallar(sesion: Session, cita_id: int) -> Cita:
-    cita = obtener(sesion, cita_id)
+async def obtener_o_fallar(sesion: AsyncSession, cita_id: int) -> Cita:
+    cita = await obtener(sesion, cita_id)
     if cita is None:
         raise RecursoNoEncontrado("una cita", cita_id)
     return cita
 
 
-def listar(
-    sesion: Session,
+async def listar(
+    sesion: AsyncSession,
     usuario_id: int | None = None,
     estado: str | None = None,
     desde: date | None = None,
@@ -41,11 +41,11 @@ def listar(
     if desde:
         consulta = consulta.where(Cita.fecha >= desde)
     consulta = consulta.order_by(Cita.fecha.desc(), Cita.hora.desc())
-    return list(sesion.scalars(consulta).unique())
+    return list((await sesion.scalars(consulta)).unique())
 
 
-def _franja_ocupada(
-    sesion: Session,
+async def _franja_ocupada(
+    sesion: AsyncSession,
     fecha: date,
     hora: time,
     producto_id: int | None,
@@ -67,16 +67,16 @@ def _franja_ocupada(
     )
     if excluir_id:
         consulta = consulta.where(Cita.id != excluir_id)
-    return sesion.scalar(consulta) is not None
+    return await sesion.scalar(consulta) is not None
 
 
-def franjas_de(sesion: Session, fecha: date, producto_id: int | None) -> list[dict]:
+async def franjas_de(sesion: AsyncSession, fecha: date, producto_id: int | None) -> list[dict]:
     """Devuelve las franjas del día marcando cuáles siguen libres."""
     ahora = datetime.now()
     salida = []
 
     for franja in FRANJAS:
-        libre = not _franja_ocupada(sesion, fecha, franja, producto_id)
+        libre = not await _franja_ocupada(sesion, fecha, franja, producto_id)
 
         # Una hora que ya pasó hoy no se ofrece aunque nadie la haya tomado.
         if fecha == ahora.date() and franja <= ahora.time():
@@ -87,20 +87,20 @@ def franjas_de(sesion: Session, fecha: date, producto_id: int | None) -> list[di
     return salida
 
 
-def crear(sesion: Session, usuario_id: int, datos: dict) -> Cita:
-    if _franja_ocupada(sesion, datos["fecha"], datos["hora"], datos.get("producto_id")):
+async def crear(sesion: AsyncSession, usuario_id: int, datos: dict) -> Cita:
+    if await _franja_ocupada(sesion, datos["fecha"], datos["hora"], datos.get("producto_id")):
         raise FranjaOcupada(
             datos["fecha"].isoformat(), datos["hora"].strftime("%H:%M")
         )
 
     cita = Cita(usuario_id=usuario_id, **datos)
     sesion.add(cita)
-    sesion.commit()
-    sesion.refresh(cita)
+    await sesion.commit()
+    await sesion.refresh(cita)
     return cita
 
 
-def actualizar(sesion: Session, cita: Cita, cambios: dict) -> Cita:
+async def actualizar(sesion: AsyncSession, cita: Cita, cambios: dict) -> Cita:
     if cita.estado in ESTADOS_CERRADOS:
         raise CitaNoModificable(cita.estado)
 
@@ -108,32 +108,32 @@ def actualizar(sesion: Session, cita: Cita, cambios: dict) -> Cita:
     hora = cambios.get("hora", cita.hora)
     producto_id = cambios.get("producto_id", cita.producto_id)
 
-    if _franja_ocupada(sesion, fecha, hora, producto_id, excluir_id=cita.id):
+    if await _franja_ocupada(sesion, fecha, hora, producto_id, excluir_id=cita.id):
         raise FranjaOcupada(fecha.isoformat(), hora.strftime("%H:%M"))
 
     for campo, valor in cambios.items():
         setattr(cita, campo, valor)
 
-    sesion.commit()
-    sesion.refresh(cita)
+    await sesion.commit()
+    await sesion.refresh(cita)
     return cita
 
 
-def cambiar_estado(sesion: Session, cita: Cita, estado: str) -> Cita:
+async def cambiar_estado(sesion: AsyncSession, cita: Cita, estado: str) -> Cita:
     cita.estado = estado
-    sesion.commit()
-    sesion.refresh(cita)
+    await sesion.commit()
+    await sesion.refresh(cita)
     return cita
 
 
-def eliminar(sesion: Session, cita: Cita) -> None:
-    sesion.delete(cita)
-    sesion.commit()
+async def eliminar(sesion: AsyncSession, cita: Cita) -> None:
+    await sesion.delete(cita)
+    await sesion.commit()
 
 
-def resumen(sesion: Session, usuario_id: int | None = None) -> dict:
+async def resumen(sesion: AsyncSession, usuario_id: int | None = None) -> dict:
     """Contadores por estado para la cabecera de los paneles."""
-    citas = listar(sesion, usuario_id=usuario_id)
+    citas = await listar(sesion, usuario_id=usuario_id)
     return {
         "total": len(citas),
         "pendientes": sum(1 for c in citas if c.estado == "pendiente"),

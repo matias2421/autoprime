@@ -175,7 +175,7 @@ app.include_router(citas.router)
 
 
 @app.get("/", tags=["Sistema"], summary="Presentación de la API")
-def raiz():
+async def raiz():
     return {
         "ok": True,
         "api": configuracion.nombre_app,
@@ -192,6 +192,6 @@ def raiz():
 
 
 @app.get("/salud", tags=["Sistema"], summary="Estado del servicio")
-def salud(sesion: SesionDep):
-    comprobar_conexion(sesion)
+async def salud(sesion: SesionDep):
+    await comprobar_conexion(sesion)
     return {"ok": True, "base_datos": "conectada", "entorno": configuracion.entorno}

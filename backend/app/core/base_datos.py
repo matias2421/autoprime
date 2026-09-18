@@ -1,17 +1,34 @@
-"""Conexión a la base de datos con SQLAlchemy."""
+"""Conexión a la base de datos con SQLAlchemy, en asíncrono.
 
-from collections.abc import Generator
+Una petición web pasa la mayor parte de su vida esperando: a la base, al
+servidor de correo, al proveedor de turno. Con el motor síncrono cada una de
+esas esperas bloquea un hilo entero; con el asíncrono, el proceso atiende otras
+mientras tanto. En una máquina pequeña —el plan gratuito de Render tiene una
+sola CPU— esa diferencia es la que separa atender a treinta personas de
+atender a tres.
 
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+El precio es que ahora toda la cadena tiene que ser asíncrona: si una sola
+función de `crud` se queda síncrona y bloquea, frena el bucle entero y el
+resto de peticiones se quedan esperando sin que nada lo delate.
+"""
+
+from collections.abc import AsyncGenerator
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.orm import DeclarativeBase
 
 from app.core.configuracion import configuracion
 
-motor = create_engine(
+motor = create_async_engine(
     configuracion.url_base_datos,
     echo=False,
-    # Cifrado del enlace con la base. En local va vacío; contra un proveedor
-    # remoto lleva el certificado de su autoridad, si se ha configurado.
+    # El cifrado del enlace con la base. En local va vacío; contra un proveedor
+    # remoto lleva el contexto TLS armado con su certificado.
     connect_args=configuracion.conexion_args,
     # MySQL cierra las conexiones que llevan rato inactivas. Sin estas dos
     # opciones, la primera petición tras un descanso fallaría con una
@@ -20,27 +37,28 @@ motor = create_engine(
     pool_recycle=3600,
 )
 
-FabricaDeSesiones = sessionmaker(bind=motor, autoflush=False, autocommit=False)
+FabricaDeSesiones = async_sessionmaker(
+    bind=motor,
+    autoflush=False,
+    expire_on_commit=False,
+)
 
 
 class Base(DeclarativeBase):
     """Base declarativa: reúne los metadatos de todas las tablas."""
 
 
-def obtener_sesion() -> Generator[Session, None, None]:
+async def obtener_sesion() -> AsyncGenerator[AsyncSession, None]:
     """Dependencia: abre la sesión, la entrega y la cierra pase lo que pase."""
-    sesion = FabricaDeSesiones()
-    try:
+    async with FabricaDeSesiones() as sesion:
         yield sesion
-    finally:
-        sesion.close()
 
 
-def comprobar_conexion(sesion: Session) -> bool:
+async def comprobar_conexion(sesion: AsyncSession) -> bool:
     """Ping de infraestructura para el endpoint de salud.
 
     No consulta ningún recurso del dominio, así que no pertenece a la capa
     `crud`: solo verifica que la conexión responde.
     """
-    sesion.execute(text("SELECT 1"))
+    await sesion.execute(text("SELECT 1"))
     return True

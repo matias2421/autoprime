@@ -36,14 +36,14 @@ router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
     status_code=status.HTTP_201_CREATED,
     summary="Registrar un cliente",
 )
-def registrar(datos: UsuarioRegistro, sesion: SesionDep) -> Sesion:
+async def registrar(datos: UsuarioRegistro, sesion: SesionDep) -> Sesion:
     """Alta pública. Siempre con rol de cliente y contraseña hasheada.
 
     Devuelve ya la sesión iniciada: quien acaba de registrarse entra sin
     tener que escribir de nuevo sus credenciales, que es como se comportaba
     el formulario desde el segundo avance.
     """
-    usuario = crud_usuarios.crear(sesion, datos.model_dump(), rol_nombre="cliente")
+    usuario = await crud_usuarios.crear(sesion, datos.model_dump(), rol_nombre="cliente")
 
     return Sesion(
         token=crear_token(usuario.id, usuario.correo, usuario.rol.nombre),
@@ -53,9 +53,9 @@ def registrar(datos: UsuarioRegistro, sesion: SesionDep) -> Sesion:
 
 
 @router.post("/login", response_model=Sesion, summary="Iniciar sesión")
-def iniciar_sesion(credenciales: Credenciales, sesion: SesionDep) -> Sesion:
+async def iniciar_sesion(credenciales: Credenciales, sesion: SesionDep) -> Sesion:
     """Verifica las credenciales y emite un JWT."""
-    usuario = crud_usuarios.obtener_por_correo(sesion, credenciales.correo)
+    usuario = await crud_usuarios.obtener_por_correo(sesion, credenciales.correo)
 
     # Mismo mensaje si el correo no existe o si la contraseña falla: decir
     # cuál de las dos falló revelaría qué correos están registrados.
@@ -75,7 +75,7 @@ def iniciar_sesion(credenciales: Credenciales, sesion: SesionDep) -> Sesion:
 
 
 @router.get("/perfil", response_model=SobreUsuario, summary="Perfil propio")
-def perfil(usuario: UsuarioActual) -> SobreUsuario:
+async def perfil(usuario: UsuarioActual) -> SobreUsuario:
     """Devuelve el usuario del token. Sirve para revalidar la sesión.
 
     Va dentro del sobre `{usuario: ...}` como el resto de la API, y no suelto:
@@ -100,7 +100,7 @@ def perfil(usuario: UsuarioActual) -> SobreUsuario:
     response_model=AvisoRecuperacion,
     summary="Solicitar la recuperación de la contraseña",
 )
-def solicitar_recuperacion(
+async def solicitar_recuperacion(
     datos: SolicitudRecuperacion, sesion: SesionDep, tareas: BackgroundTasks
 ) -> AvisoRecuperacion:
     """Primer paso: pedir por correo el enlace para volver a entrar.
@@ -118,7 +118,7 @@ def solicitar_recuperacion(
     puede tardar segundos y quien rellenó el formulario no tiene por qué
     esperarlos.
     """
-    usuario = crud_usuarios.obtener_por_correo(sesion, datos.correo)
+    usuario = await crud_usuarios.obtener_por_correo(sesion, datos.correo)
 
     if usuario is not None and usuario.estado == "activo":
         tareas.add_task(
@@ -142,7 +142,7 @@ def solicitar_recuperacion(
     response_model=RespuestaSimple,
     summary="Restablecer la contraseña con el token recibido",
 )
-def restablecer_contrasena(
+async def restablecer_contrasena(
     datos: RestablecerContrasena, sesion: SesionDep
 ) -> RespuestaSimple:
     """Segundo paso: canjear el token por una contraseña nueva."""
@@ -156,7 +156,7 @@ def restablecer_contrasena(
 
     identificador = carga.get("sub")
     usuario = (
-        crud_usuarios.obtener(sesion, int(identificador))
+        await crud_usuarios.obtener(sesion, int(identificador))
         if identificador is not None
         else None
     )
@@ -168,7 +168,7 @@ def restablecer_contrasena(
     if carga.get("huella") != huella_contrasena(usuario.password_hash):
         raise NoAutenticado("Este enlace ya se usó. Solicita uno nuevo.")
 
-    crud_usuarios.cambiar_contrasena(sesion, usuario, datos.password)
+    await crud_usuarios.cambiar_contrasena(sesion, usuario, datos.password)
 
     return RespuestaSimple(
         mensaje="Contraseña actualizada. Ya puedes iniciar sesión con ella."

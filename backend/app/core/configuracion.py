@@ -6,6 +6,7 @@ el fichero `.env`, que queda fuera del repositorio. En un servidor no hay
 lo que cambia entre el portátil y el despliegue vive aquí.
 """
 
+import ssl
 from urllib.parse import parse_qsl, quote_plus, urlencode, urlsplit, urlunsplit
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -107,19 +108,32 @@ class Configuracion(BaseSettings):
 
     @property
     def url_base_datos(self) -> str:
-        """Cadena de conexión de SQLAlchemy."""
+        """Cadena de conexión de la API, que habla con la base en asíncrono."""
+        return self._con_driver("mysql+aiomysql")
+
+    @property
+    def url_base_datos_sincrona(self) -> str:
+        """La misma base, pero para los scripts de línea de órdenes.
+
+        Preparar la base o sembrarla son tareas de una sola pasada: no ganan
+        nada siendo asíncronas y sí pierden en claridad. Comparten destino con
+        la API y solo cambian de driver.
+        """
+        return self._con_driver("mysql+pymysql")
+
+    def _con_driver(self, driver: str) -> str:
         if self.database_url:
-            return self._normalizar(self.database_url)
+            return self._normalizar(self.database_url, driver)
 
         # La contraseña se escapa porque las que generan los proveedores
         # llevan símbolos que, sin escapar, parten la URL en dos.
         return (
-            f"mysql+pymysql://{self.db_user}:{quote_plus(self.db_password)}"
+            f"{driver}://{self.db_user}:{quote_plus(self.db_password)}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}?charset=utf8mb4"
         )
 
     @staticmethod
-    def _normalizar(cruda: str) -> str:
+    def _normalizar(cruda: str, driver: str = "mysql+aiomysql") -> str:
         """Deja una URI de proveedor en la forma que entiende SQLAlchemy.
 
         Las cadenas que reparten Aiven o Render vienen pensadas para el cliente
@@ -131,9 +145,10 @@ class Configuracion(BaseSettings):
         """
         partes = urlsplit(cruda)
 
-        esquema = partes.scheme
-        if esquema in ("mysql", "mariadb"):
-            esquema = "mysql+pymysql"
+        # Se impone el driver que toca, venga como venga: las URIs de los
+        # proveedores dicen `mysql://` a secas, y las copiadas de un ejemplo
+        # pueden traer ya un driver que no es el que queremos aquí.
+        esquema = driver if partes.scheme.startswith(("mysql", "mariadb")) else partes.scheme
 
         consulta = [(c, v) for c, v in parse_qsl(partes.query) if c == "charset"]
         if not consulta:
@@ -145,10 +160,27 @@ class Configuracion(BaseSettings):
 
     @property
     def conexion_args(self) -> dict:
-        """Opciones que se pasan al driver, no a SQLAlchemy."""
+        """Opciones de TLS para el driver asíncrono de la API.
+
+        aiomysql y PyMySQL no lo piden igual: PyMySQL acepta rutas sueltas
+        (`ssl_ca`, `ssl_verify_cert`) y aiomysql quiere un contexto ya armado.
+        Pasarle a uno lo del otro no da un error claro, así que cada cual
+        recibe lo suyo.
+        """
         if not self.db_ssl_ca:
-            # Sin certificado no se fuerza nada: PyMySQL intenta TLS de todos
-            # modos y lo consigue con cualquier proveedor serio.
+            # Sin certificado no se fuerza nada: el driver negocia TLS de
+            # todos modos y lo consigue con cualquier proveedor serio.
+            return {}
+
+        contexto = ssl.create_default_context(cafile=self.db_ssl_ca)
+        contexto.check_hostname = True
+        contexto.verify_mode = ssl.CERT_REQUIRED
+        return {"ssl": contexto}
+
+    @property
+    def conexion_args_sincrona(self) -> dict:
+        """Lo mismo, en la forma que entiende PyMySQL, para los scripts."""
+        if not self.db_ssl_ca:
             return {}
 
         return {

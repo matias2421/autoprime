@@ -1,7 +1,7 @@
 """Acceso a datos de usuarios y roles."""
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.seguridad import hashear_contrasena
 from app.errores import (
@@ -12,33 +12,33 @@ from app.errores import (
 from app.models.autoprime import Rol, Usuario
 
 
-def obtener_rol_por_nombre(sesion: Session, nombre: str) -> Rol:
-    rol = sesion.scalar(select(Rol).where(Rol.nombre == nombre))
+async def obtener_rol_por_nombre(sesion: AsyncSession, nombre: str) -> Rol:
+    rol = await sesion.scalar(select(Rol).where(Rol.nombre == nombre))
     if rol is None:
         raise RecursoNoEncontrado("un rol", nombre)
     return rol
 
 
-def obtener_por_correo(sesion: Session, correo: str) -> Usuario | None:
+async def obtener_por_correo(sesion: AsyncSession, correo: str) -> Usuario | None:
     """Busca sin distinguir mayúsculas: los correos se guardan en minúscula."""
-    return sesion.scalar(
+    return await sesion.scalar(
         select(Usuario).where(func.lower(Usuario.correo) == correo.lower())
     )
 
 
-def obtener(sesion: Session, usuario_id: int) -> Usuario | None:
-    return sesion.get(Usuario, usuario_id)
+async def obtener(sesion: AsyncSession, usuario_id: int) -> Usuario | None:
+    return await sesion.get(Usuario, usuario_id)
 
 
-def obtener_o_fallar(sesion: Session, usuario_id: int) -> Usuario:
-    usuario = obtener(sesion, usuario_id)
+async def obtener_o_fallar(sesion: AsyncSession, usuario_id: int) -> Usuario:
+    usuario = await obtener(sesion, usuario_id)
     if usuario is None:
         raise RecursoNoEncontrado("un usuario", usuario_id)
     return usuario
 
 
-def listar(
-    sesion: Session,
+async def listar(
+    sesion: AsyncSession,
     rol: str | None = None,
     estado: str | None = None,
     buscar: str | None = None,
@@ -58,11 +58,11 @@ def listar(
             | Usuario.numero_documento.like(patron)
         )
 
-    return list(sesion.scalars(consulta.order_by(Usuario.id)).unique())
+    return list((await sesion.scalars(consulta.order_by(Usuario.id))).unique())
 
 
-def _comprobar_duplicados(
-    sesion: Session,
+async def _comprobar_duplicados(
+    sesion: AsyncSession,
     correo: str,
     tipo_documento: str,
     numero_documento: str,
@@ -76,7 +76,7 @@ def _comprobar_duplicados(
     consulta = select(Usuario).where(func.lower(Usuario.correo) == correo.lower())
     if excluir_id:
         consulta = consulta.where(Usuario.id != excluir_id)
-    if sesion.scalar(consulta):
+    if await sesion.scalar(consulta):
         raise CorreoYaRegistrado(correo)
 
     consulta = select(Usuario).where(
@@ -85,17 +85,17 @@ def _comprobar_duplicados(
     )
     if excluir_id:
         consulta = consulta.where(Usuario.id != excluir_id)
-    if sesion.scalar(consulta):
+    if await sesion.scalar(consulta):
         raise DocumentoYaRegistrado(tipo_documento, numero_documento)
 
 
-def crear(sesion: Session, datos: dict, rol_nombre: str = "cliente") -> Usuario:
+async def crear(sesion: AsyncSession, datos: dict, rol_nombre: str = "cliente") -> Usuario:
     """Da de alta un usuario. La contraseña se hashea aquí, nunca antes."""
-    _comprobar_duplicados(
+    await _comprobar_duplicados(
         sesion, datos["correo"], datos["tipo_documento"], datos["numero_documento"]
     )
 
-    rol = obtener_rol_por_nombre(sesion, rol_nombre)
+    rol = await obtener_rol_por_nombre(sesion, rol_nombre)
     contrasena = datos.pop("password")
     limpios = {k: v for k, v in datos.items() if k != "confirmar_password"}
 
@@ -107,18 +107,18 @@ def crear(sesion: Session, datos: dict, rol_nombre: str = "cliente") -> Usuario:
     usuario.correo = usuario.correo.lower()
 
     sesion.add(usuario)
-    sesion.commit()
-    sesion.refresh(usuario)
+    await sesion.commit()
+    await sesion.refresh(usuario)
     return usuario
 
 
-def actualizar(sesion: Session, usuario: Usuario, cambios: dict) -> Usuario:
+async def actualizar(sesion: AsyncSession, usuario: Usuario, cambios: dict) -> Usuario:
     rol_nombre = cambios.pop("rol", None)
 
     correo = cambios.get("correo", usuario.correo)
     tipo = cambios.get("tipo_documento", usuario.tipo_documento)
     numero = cambios.get("numero_documento", usuario.numero_documento)
-    _comprobar_duplicados(sesion, correo, tipo, numero, excluir_id=usuario.id)
+    await _comprobar_duplicados(sesion, correo, tipo, numero, excluir_id=usuario.id)
 
     for campo, valor in cambios.items():
         setattr(usuario, campo, valor)
@@ -126,14 +126,14 @@ def actualizar(sesion: Session, usuario: Usuario, cambios: dict) -> Usuario:
         usuario.correo = usuario.correo.lower()
 
     if rol_nombre:
-        usuario.rol_id = obtener_rol_por_nombre(sesion, rol_nombre).id
+        usuario.rol_id = (await obtener_rol_por_nombre(sesion, rol_nombre)).id
 
-    sesion.commit()
-    sesion.refresh(usuario)
+    await sesion.commit()
+    await sesion.refresh(usuario)
     return usuario
 
 
-def cambiar_contrasena(sesion: Session, usuario: Usuario, nueva: str) -> Usuario:
+async def cambiar_contrasena(sesion: AsyncSession, usuario: Usuario, nueva: str) -> Usuario:
     """Reemplaza el hash por el de la contraseña nueva.
 
     Al cambiar el hash quedan invalidados de paso todos los enlaces de
@@ -141,18 +141,18 @@ def cambiar_contrasena(sesion: Session, usuario: Usuario, nueva: str) -> Usuario
     anterior y ya no coincidirá.
     """
     usuario.password_hash = hashear_contrasena(nueva)
-    sesion.commit()
-    sesion.refresh(usuario)
+    await sesion.commit()
+    await sesion.refresh(usuario)
     return usuario
 
 
-def cambiar_estado(sesion: Session, usuario: Usuario, estado: str) -> Usuario:
+async def cambiar_estado(sesion: AsyncSession, usuario: Usuario, estado: str) -> Usuario:
     usuario.estado = estado
-    sesion.commit()
-    sesion.refresh(usuario)
+    await sesion.commit()
+    await sesion.refresh(usuario)
     return usuario
 
 
-def eliminar(sesion: Session, usuario: Usuario) -> None:
-    sesion.delete(usuario)
-    sesion.commit()
+async def eliminar(sesion: AsyncSession, usuario: Usuario) -> None:
+    await sesion.delete(usuario)
+    await sesion.commit()

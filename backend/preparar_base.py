@@ -120,14 +120,17 @@ def main() -> int:
     opciones = analizador.parse_args()
 
     # De la URL solo se enseña el destino: la contraseña va dentro.
-    destino = configuracion.url_base_datos.split("@")[-1]
+    destino = configuracion.url_base_datos_sincrona.split("@")[-1]
     print(f"  Base de datos : {destino}")
     print(f"  TLS verificado: {'sí' if configuracion.db_ssl_ca else 'no (modo preferente)'}")
     print()
 
+    # Este script va en sincrono a proposito: es una tarea de una sola pasada
+    # y no gana nada con el bucle de eventos. La API si es asincrona, asi que
+    # aqui se piden la URL y las opciones de TLS en su forma sincrona.
     motor = create_engine(
-        configuracion.url_base_datos,
-        connect_args=configuracion.conexion_args,
+        configuracion.url_base_datos_sincrona,
+        connect_args=configuracion.conexion_args_sincrona,
         pool_pre_ping=True,
     )
 

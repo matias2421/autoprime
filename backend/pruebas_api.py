@@ -84,14 +84,27 @@ def token_de_recuperacion(correo: str) -> str:
     se comprueba mas abajo—, y sin buzon esta es la unica forma de alcanzar el
     segundo paso. Lo que se ejercita sigue siendo el endpoint por HTTP.
     """
-    from app.core.base_datos import FabricaDeSesiones
-    from app.core.seguridad import crear_token_recuperacion
-    from app.crud import usuarios as crud
+    from sqlalchemy import create_engine, text
 
-    with FabricaDeSesiones() as sesion:
-        usuario = crud.obtener_por_correo(sesion, correo)
-        assert usuario is not None, f"no existe la cuenta {correo}"
-        return crear_token_recuperacion(usuario.id, usuario.password_hash)
+    from app.core.configuracion import configuracion
+    from app.core.seguridad import crear_token_recuperacion
+
+    # Se consulta con el motor sincrono, no con la capa `crud` de la API: esa
+    # es asincrona desde la migracion, y arrastrar un bucle de eventos hasta
+    # aqui solo para leer una fila complicaria el guion sin ganar nada. Lo que
+    # se prueba sigue siendo el endpoint por HTTP.
+    motor = create_engine(
+        configuracion.url_base_datos_sincrona,
+        connect_args=configuracion.conexion_args_sincrona,
+    )
+    with motor.connect() as conexion:
+        fila = conexion.execute(
+            text("SELECT id, password_hash FROM usuarios WHERE correo = :c"),
+            {"c": correo},
+        ).first()
+
+    assert fila is not None, f"no existe la cuenta {correo}"
+    return crear_token_recuperacion(fila.id, fila.password_hash)
 
 
 def seccion(titulo):

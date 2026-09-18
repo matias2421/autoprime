@@ -58,7 +58,7 @@ app = FastAPI(
 # navegador es de origen cruzado y necesita esta autorización explícita.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=configuracion.origenes_permitidos,
+    allow_origins=configuracion.origenes,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],

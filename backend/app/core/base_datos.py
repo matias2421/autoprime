@@ -10,6 +10,9 @@ from app.core.configuracion import configuracion
 motor = create_engine(
     configuracion.url_base_datos,
     echo=False,
+    # Cifrado del enlace con la base. En local va vacío; contra un proveedor
+    # remoto lleva el certificado de su autoridad, si se ha configurado.
+    connect_args=configuracion.conexion_args,
     # MySQL cierra las conexiones que llevan rato inactivas. Sin estas dos
     # opciones, la primera petición tras un descanso fallaría con una
     # conexión ya muerta que el pool creía viva.

@@ -1,0 +1,65 @@
+# Despliegue del backend en Render.
+#
+# Con este archivo en la raíz, Render ofrece crear el servicio ya configurado
+# en lugar de ir rellenando campos a mano en su panel. Los valores que llevan
+# `sync: false` no se guardan aquí: son secretos o dependen de direcciones que
+# todavía no existen cuando se crea el servicio, y se escriben en el panel.
+#
+# El plan gratuito duerme el servicio a los 15 minutos sin visitas y tarda
+# entre 30 y 60 segundos en despertar. Para sustentar, conviene abrir la URL
+# unos minutos antes.
+
+services:
+  - type: web
+    name: autoprime-api
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: backend
+
+    buildCommand: pip install -r requirements.txt
+
+    # El servicio tiene que escuchar en todas las interfaces y en el puerto
+    # que Render asigna; con los valores de local no recibiría tráfico.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+    # Render consulta esta ruta para saber si el servicio está sano. Apunta a
+    # /salud, que además comprueba la conexión con la base: si la base cae, el
+    # panel lo refleja en lugar de dar el servicio por bueno.
+    healthCheckPath: /salud
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+
+      - key: ENTORNO
+        value: produccion
+
+      # Render genera una clave aleatoria la primera vez y la conserva. Es
+      # mejor que traerse la de local: esa ha pasado por el portátil, por el
+      # historial de la consola y por las copias del .env.
+      - key: SECRET_KEY
+        generateValue: true
+
+      # Cadena de conexión de Aiven, tal como la copian de su panel.
+      - key: DATABASE_URL
+        sync: false
+
+      # La dirección de Vercel, separada por comas si hay varias.
+      - key: ORIGENES_PERMITIDOS
+        sync: false
+
+      # Con esta se arma el enlace que viaja en el correo de recuperación.
+      - key: URL_FRONTEND
+        sync: false
+
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PUERTO
+        value: "587"
+      - key: SMTP_USUARIO
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_REMITENTE
+        sync: false

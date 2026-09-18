@@ -275,6 +275,24 @@ class Configuracion(BaseSettings):
         return _CERTIFICADO_TEMPORAL
 
     @property
+    def modo_cifrado(self) -> str:
+        """Como va el enlace con la base, en una palabra.
+
+        Existe para poder comprobarlo desde fuera despues de desplegar. La
+        alternativa era mirar el registro de arranque en el panel del
+        proveedor, y eso no se hace: se da por hecho que quedo bien.
+
+        No dice nada que ayude a atacar. El enlace va entre el servidor de la
+        aplicacion y el de la base, no pasa por el navegador de nadie, asi que
+        saber si esta verificado no le abre ninguna puerta a quien lea esto;
+        y a quien lo despliega le ahorra descubrir de la peor manera que la
+        variable del certificado nunca llego.
+        """
+        if self._ruta_certificado():
+            return "verificado"
+        return "sin verificar" if not self.es_base_local else "sin cifrar (local)"
+
+    @property
     def conexion_args(self) -> dict:
         """Opciones de TLS para el driver asincrono de la API.
 

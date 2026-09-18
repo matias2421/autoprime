@@ -417,5 +417,17 @@ async def raiz():
 
 @app.get("/salud", tags=["Sistema"], summary="Estado del servicio")
 async def salud(sesion: SesionDep):
+    """Lo que Render consulta para saber si el servicio esta sano.
+
+    Comprueba la conexion de verdad, no solo que el proceso responda: si la
+    base cae, el panel del proveedor lo refleja en lugar de dar el servicio
+    por bueno. Y dice como va el cifrado del enlace, que es la unica forma de
+    confirmar desde fuera que el certificado llego al despliegue.
+    """
     await comprobar_conexion(sesion)
-    return {"ok": True, "base_datos": "conectada", "entorno": configuracion.entorno}
+    return {
+        "ok": True,
+        "base_datos": "conectada",
+        "cifrado": configuracion.modo_cifrado,
+        "entorno": configuracion.entorno,
+    }

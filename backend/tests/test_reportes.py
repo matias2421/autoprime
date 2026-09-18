@@ -241,3 +241,16 @@ async def _vender(cliente, como, datos):
     )
     assert respuesta.status_code == 201, respuesta.text
     return respuesta.json()["venta"]
+
+
+class TestSalud:
+    async def test_dice_como_va_el_cifrado(self, cliente):
+        """Es la unica forma de confirmar desde fuera que el certificado
+        llego al despliegue. Sin esto habria que fiarse de que la variable
+        se pego bien."""
+        respuesta = await cliente.get("/salud")
+        assert respuesta.status_code == 200
+
+        cuerpo = respuesta.json()
+        assert cuerpo["base_datos"] == "conectada"
+        assert cuerpo["cifrado"] in ("verificado", "sin verificar", "sin cifrar (local)")

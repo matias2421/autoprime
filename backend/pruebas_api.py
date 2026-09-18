@@ -21,6 +21,16 @@ from datetime import date, datetime, timedelta
 #   set API_AUTOPRIME=http://127.0.0.1:8020
 API = os.environ.get("API_AUTOPRIME", "http://127.0.0.1:8000")
 
+# Tres comprobaciones del olvido necesitan fabricar un token de recuperacion
+# valido, y para eso hay que firmar con la misma SECRET_KEY que usa la API y
+# leer la misma base. Eso solo se cumple cuando la API corre en esta maquina.
+#
+# Contra un despliegue no se cumple ni debe cumplirse: alli la clave la genera
+# el proveedor y no sale de su panel. Firmar con otra da 401, que es la
+# respuesta correcta; contarlo como fallo seria culpar al despliegue de estar
+# bien hecho. Asi que esas tres se saltan y se dice por que.
+MISMO_SECRETO = API.startswith(("http://127.0.0.1", "http://localhost"))
+
 correctas = 0
 fallidas = 0
 tokens: dict[str, str] = {}
@@ -502,7 +512,9 @@ aviso = probar(
 assert "token" not in aviso, "el enlace no debe volver en la respuesta"
 print(f"        -> enlace valido {aviso['expiraEnMinutos']} minutos, enviado por correo")
 
-token_recuperacion = token_de_recuperacion(CORREO_PRUEBA)
+token_recuperacion = (
+    token_de_recuperacion(CORREO_PRUEBA) if MISMO_SECRETO else ""
+)
 
 # Un correo sin cuenta responde igual: si respondiera distinto, este endpoint
 # serviria para averiguar que correos estan registrados.
@@ -517,13 +529,14 @@ assert sin_cuenta == aviso, "las dos respuestas deben ser identicas"
 print("        -> respuesta identica: no revela si la cuenta existe")
 
 # Un token de recuperacion identifica al usuario, pero no debe abrir sesion.
-probar(
-    "el token de recuperacion NO vale como sesion -> 401",
-    401,
-    "GET",
-    "/api/auth/perfil",
-    token=token_recuperacion,
-)
+if MISMO_SECRETO:
+    probar(
+        "el token de recuperacion NO vale como sesion -> 401",
+        401,
+        "GET",
+        "/api/auth/perfil",
+        token=token_recuperacion,
+    )
 # Y al reves: el de sesion no sirve para restablecer.
 probar(
     "el token de sesion NO vale para restablecer -> 401",
@@ -558,37 +571,44 @@ probar(
      "confirmarPassword": "Otra2026!"},
 )
 
-probar(
-    "restablecer con el token valido",
-    200,
-    "POST",
-    "/api/auth/restablecer",
-    {"token": token_recuperacion, "password": NUEVA_CONTRASENA,
-     "confirmarPassword": NUEVA_CONTRASENA},
-)
-probar(
-    "entra con la contrasena nueva",
-    200,
-    "POST",
-    "/api/auth/login",
-    {"correo": CORREO_PRUEBA, "password": NUEVA_CONTRASENA},
-)
-probar(
-    "la contrasena vieja ya no sirve -> 401",
-    401,
-    "POST",
-    "/api/auth/login",
-    {"correo": CORREO_PRUEBA, "password": CONTRASENA_VIEJA},
-)
-# El enlace es de un solo uso: la huella se calculo con el hash anterior.
-probar(
-    "reutilizar el mismo enlace -> 401",
-    401,
-    "POST",
-    "/api/auth/restablecer",
-    {"token": token_recuperacion, "password": "Tercera2026!",
-     "confirmarPassword": "Tercera2026!"},
-)
+if MISMO_SECRETO:
+    probar(
+        "restablecer con el token valido",
+        200,
+        "POST",
+        "/api/auth/restablecer",
+        {"token": token_recuperacion, "password": NUEVA_CONTRASENA,
+         "confirmarPassword": NUEVA_CONTRASENA},
+    )
+    probar(
+        "entra con la contrasena nueva",
+        200,
+        "POST",
+        "/api/auth/login",
+        {"correo": CORREO_PRUEBA, "password": NUEVA_CONTRASENA},
+    )
+    probar(
+        "la contrasena vieja ya no sirve -> 401",
+        401,
+        "POST",
+        "/api/auth/login",
+        {"correo": CORREO_PRUEBA, "password": CONTRASENA_VIEJA},
+    )
+    # El enlace es de un solo uso: la huella se calculo con el hash anterior.
+    probar(
+        "reutilizar el mismo enlace -> 401",
+        401,
+        "POST",
+        "/api/auth/restablecer",
+        {"token": token_recuperacion, "password": "Tercera2026!",
+         "confirmarPassword": "Tercera2026!"},
+    )
+else:
+    print()
+    print("        OMITIDAS 5 comprobaciones que canjean el enlace:")
+    print("        firmarlo exige la SECRET_KEY de la API, y contra un")
+    print("        despliegue no la tenemos ni debemos tenerla. Se prueban")
+    print("        en local, donde si se comparte.")
 
 # --------------------------------------------------------------------------
 seccion("ALIAS /api/usuarios/registro")

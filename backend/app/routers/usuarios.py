@@ -3,13 +3,14 @@
 from fastapi import APIRouter, Query, status
 
 from app.crud import usuarios as crud_usuarios
-from app.dependencias import SesionDep, SoloAdmin, UsuarioRuta
+from app.dependencias import Personal, SesionDep, SoloAdmin, UsuarioRuta
 from app.routers.auth import registrar
 from app.schemas.auth import Sesion
 from app.schemas.comunes import EstadoCuenta, NombreRol, RespuestaSimple
-from app.schemas.sobres import SobreUsuario, SobreUsuarios
+from app.schemas.sobres import SobreClientes, SobreUsuario, SobreUsuarios
 from app.schemas.usuario import (
     CambioEstado,
+    ClienteBreve,
     UsuarioActualizar,
     UsuarioCrear,
     UsuarioRegistro,
@@ -37,6 +38,35 @@ async def registro_publico(datos: UsuarioRegistro, sesion: SesionDep) -> Sesion:
     interpretar como un identificador.
     """
     return await registrar(datos, sesion)
+
+
+@router.get(
+    "/clientes",
+    response_model=SobreClientes,
+    summary="Buscar clientes (para registrar una venta)",
+)
+async def buscar_clientes(
+    sesion: SesionDep,
+    _: Personal,
+    buscar: str | None = Query(default=None, min_length=2, max_length=60),
+) -> SobreClientes:
+    """Selector de comprador para el mostrador.
+
+    Existe porque `GET /api/usuarios` es solo del administrador, y quien
+    registra una venta de mostrador es el empleado. Abrirle aquel listado le
+    daria de paso la ficha completa de todo el mundo —direcciones, telefonos,
+    las cuentas del personal— para una tarea que solo necesita saber a quien
+    se le registra la venta. Asi que en vez de ampliar el permiso se entrega
+    menos: solo clientes activos, y de cada uno cuatro campos.
+
+    Va declarada antes que `/{usuario_id}` para que "clientes" no se intente
+    interpretar como un identificador.
+    """
+    usuarios = await crud_usuarios.listar(
+        sesion, rol="cliente", estado="activo", buscar=buscar
+    )
+    salida = [ClienteBreve.desde_modelo(u) for u in usuarios]
+    return SobreClientes(clientes=salida, total=len(salida))
 
 
 @router.get("", response_model=SobreUsuarios, summary="Listar usuarios")

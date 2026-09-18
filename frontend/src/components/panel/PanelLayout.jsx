@@ -88,14 +88,30 @@ function Estado({ valor }) {
     completada: "border-hueso/40 text-hueso",
     disponible: "border-exito/50 text-exito",
     vendido: "border-plomo text-plomo",
+
+    // Quinto avance: ventas, facturas y PQR.
+    //
+    // El ambar no es decorativo: marca lo que espera una accion de alguien
+    // -una venta por cobrar, una PQR sin responder- y es lo que hace que la
+    // bandeja se lea de un vistazo en vez de fila por fila.
+    pagada: "border-exito/50 text-exito",
+    anulada: "border-plomo text-plomo",
+    emitida: "border-exito/50 text-exito",
+    en_proceso: "border-amber-500/50 text-amber-500",
+    respondida: "border-exito/50 text-exito",
+    cerrada: "border-plomo text-plomo",
   };
+
+  // `en_proceso` se guarda con guion bajo porque asi esta en la base; en
+  // pantalla se lee mejor con espacio.
+  const texto = String(valor || "").replace(/_/g, " ");
 
   return (
     <span
       className={`inline-flex items-center border px-2.5 py-1 font-sans text-xs
                   uppercase tracking-[0.12em] ${colores[valor] || "border-linea text-ceniza"}`}
     >
-      {valor}
+      {texto}
     </span>
   );
 }

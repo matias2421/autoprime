@@ -21,6 +21,16 @@ const FAMILIAS = [
 
 const AGENDAR = { a: "/agendar", clave: "nav.agendar", icono: "reloj" };
 
+// Las cuatro pantallas del quinto avance. Solo aparecen con sesion
+// iniciada, y son las mismas para los tres roles: lo que cambia es lo que
+// devuelve la API detras, no la navegacion.
+const PRIVADOS = [
+  { a: "/panel/tablero", texto: "Tablero", icono: "rayo" },
+  { a: "/panel/ventas", texto: "Ventas", icono: "etiqueta" },
+  { a: "/panel/facturas", texto: "Facturas", icono: "documento" },
+  { a: "/panel/pqr", texto: "PQR", icono: "alerta" },
+];
+
 /** Ruta del panel que corresponde a cada rol. */
 const PANEL_POR_ROL = {
   administrador: "/panel/admin",
@@ -221,6 +231,21 @@ function Header() {
           <FilaRail a={AGENDAR.a} icono={AGENDAR.icono}>
             {t(AGENDAR.clave)}
           </FilaRail>
+
+          {autenticado && (
+            <>
+              <span
+                aria-hidden="true"
+                className="my-2 h-px shrink-0 bg-linea"
+                style={{ marginInline: 16 }}
+              />
+              {PRIVADOS.map((enlace) => (
+                <FilaRail key={enlace.a} a={enlace.a} icono={enlace.icono}>
+                  {enlace.texto}
+                </FilaRail>
+              ))}
+            </>
+          )}
         </nav>
 
         {/* Pie del raíl: idioma y sesión */}
@@ -424,6 +449,25 @@ function Header() {
                   </Link>
                 </li>
               )}
+
+              {/* En movil el rail no existe, asi que las pantallas privadas
+                  tienen que estar tambien aqui o quedan sin ninguna via de
+                  acceso salvo escribir la URL. */}
+              {autenticado &&
+                PRIVADOS.map((enlace) => (
+                  <li key={enlace.a}>
+                    <Link
+                      to={enlace.a}
+                      onClick={cerrarMenu}
+                      className="flex min-h-12 items-center gap-3 font-sans text-xs uppercase
+                                 tracking-[0.18em] text-ceniza transition-colors duration-200
+                                 hover:text-hueso"
+                    >
+                      <Icono nombre={enlace.icono} className="h-4 w-4 text-accion" />
+                      {enlace.texto}
+                    </Link>
+                  </li>
+                ))}
             </ul>
           </nav>
         </div>

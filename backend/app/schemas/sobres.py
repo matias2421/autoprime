@@ -14,7 +14,7 @@ from app.schemas.paginacion import Pagina
 from app.schemas.producto import ProductoSalida
 from app.schemas.pqr import PqrSalida, ResumenPqr
 from app.schemas.servicio import ServicioSalida
-from app.schemas.usuario import UsuarioSalida
+from app.schemas.usuario import ClienteBreve, UsuarioSalida
 from app.schemas.venta import ResumenVentas, VentaSalida
 
 
@@ -121,3 +121,8 @@ class SobreConversacion(Esquema):
 
 class SobreChat(Esquema):
     chat: RespuestaChat
+
+
+class SobreClientes(Esquema):
+    clientes: list[ClienteBreve]
+    total: int

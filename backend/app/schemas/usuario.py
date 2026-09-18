@@ -115,3 +115,29 @@ class UsuarioSalida(Esquema):
             creado_en=usuario.creado_en,
             rol=usuario.rol.nombre,
         )
+
+
+class ClienteBreve(Esquema):
+    """Lo justo para elegir un comprador en el formulario de venta.
+
+    Deliberadamente NO lleva direccion, telefono ni fecha de alta. Quien
+    registra una venta de mostrador necesita saber a quien se la registra, no
+    tener delante la ficha completa de todos los clientes: si el dato no hace
+    falta para la tarea, no se entrega.
+    """
+
+    id: int
+    nombre: str
+    apellido: str
+    documento: str
+    correo: str
+
+    @classmethod
+    def desde_modelo(cls, u) -> "ClienteBreve":
+        return cls(
+            id=u.id,
+            nombre=u.nombre,
+            apellido=u.apellido,
+            documento=f"{u.tipo_documento} {u.numero_documento}",
+            correo=u.correo,
+        )

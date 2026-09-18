@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import WhatsAppButton from "../components/WhatsAppButton";
+import Asistente from "../components/chat/Asistente";
 import BotonArriba from "../components/BotonArriba";
 import CursorLente from "../components/CursorLente";
 import TransicionPagina from "../components/TransicionPagina";
@@ -22,6 +23,10 @@ import AgendarCita from "../pages/AgendarCita";
 import PanelAdmin from "../pages/panel/PanelAdmin";
 import PanelEmpleado from "../pages/panel/PanelEmpleado";
 import PanelCliente from "../pages/panel/PanelCliente";
+import Tablero from "../pages/panel/Tablero";
+import Ventas from "../pages/panel/Ventas";
+import Facturas from "../pages/panel/Facturas";
+import Pqr from "../pages/panel/Pqr";
 import NoEncontrado from "../pages/NoEncontrado";
 
 /**
@@ -107,6 +112,47 @@ function AppRouter() {
                 }
               />
 
+              {/* -------- Quinto avance: comercial, PQR y tableros -------- */}
+              {/*
+                Las cuatro son de cualquiera con sesion iniciada, no solo del
+                personal: la misma pantalla sirve los dos casos porque el
+                backend ya decide que devuelve segun el rol. Un cliente ve sus
+                compras, sus facturas y sus PQR; el personal, las de todos.
+                Limitarlas por rol aqui obligaria a duplicar cada pantalla.
+              */}
+              <Route
+                path="/panel/tablero"
+                element={
+                  <RutaProtegida>
+                    <Tablero />
+                  </RutaProtegida>
+                }
+              />
+              <Route
+                path="/panel/ventas"
+                element={
+                  <RutaProtegida>
+                    <Ventas />
+                  </RutaProtegida>
+                }
+              />
+              <Route
+                path="/panel/facturas"
+                element={
+                  <RutaProtegida>
+                    <Facturas />
+                  </RutaProtegida>
+                }
+              />
+              <Route
+                path="/panel/pqr"
+                element={
+                  <RutaProtegida>
+                    <Pqr />
+                  </RutaProtegida>
+                }
+              />
+
               <Route path="*" element={<NoEncontrado />} />
             </Routes>
           </TransicionPagina>
@@ -117,6 +163,7 @@ function AppRouter() {
         {/* Botones flotantes, visibles en toda la app. */}
         <CursorLente />
         <BotonArriba />
+        <Asistente />
         <WhatsAppButton />
       </AuthProvider>
     </BrowserRouter>

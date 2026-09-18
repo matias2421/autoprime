@@ -1,0 +1,2550 @@
+{
+  "info": {
+    "name": "AutoPrime API",
+    "description": "Bateria de la API de AutoPrime (quinto avance).\n\nGenerada a partir del OpenAPI que publica la propia aplicacion, asi que la lista de endpoints no puede quedarse atras.\n\nCOMO CORRERLA\n1. Importa tambien el entorno (AutoPrime.postman_environment.json) y elige si apunta a local o al despliegue.\n2. Usa el Collection Runner en orden: la peticion de login guarda el token y las siguientes lo reutilizan; el catalogo guarda un vehiculo, la venta guarda su id, y asi.\n3. La ultima carpeta comprueba lo que debe fallar.\n\nOjo: correr la coleccion entera crea filas de verdad (una venta, una factura, una PQR). Contra el despliegue, borrarlas despues.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "correoAdmin",
+      "value": "admin@autoprime.com.co"
+    },
+    {
+      "key": "claveAdmin",
+      "value": "Admin2026!"
+    },
+    {
+      "key": "correoNuevo",
+      "value": "postman@autoprime.com.co"
+    },
+    {
+      "key": "documentoNuevo",
+      "value": "1099887766"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "rol",
+      "value": ""
+    },
+    {
+      "key": "productoId",
+      "value": ""
+    },
+    {
+      "key": "productoCreadoId",
+      "value": ""
+    },
+    {
+      "key": "precioProducto",
+      "value": ""
+    },
+    {
+      "key": "clienteId",
+      "value": ""
+    },
+    {
+      "key": "ventaId",
+      "value": ""
+    },
+    {
+      "key": "facturaId",
+      "value": ""
+    },
+    {
+      "key": "pqrId",
+      "value": ""
+    },
+    {
+      "key": "conversacionId",
+      "value": ""
+    },
+    {
+      "key": "usuarioId",
+      "value": ""
+    },
+    {
+      "key": "servicioId",
+      "value": ""
+    },
+    {
+      "key": "citaId",
+      "value": ""
+    },
+    {
+      "key": "identificador",
+      "value": ""
+    },
+    {
+      "key": "fechaCita",
+      "value": ""
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Freno de mano.",
+          "//",
+          "// Una coleccion generada del OpenAPI trae tambien los DELETE y los",
+          "// PUT, y sus ids hay que rellenarlos con algo. La primera version",
+          "// los dejaba en 1, y al correrla entera borro el administrador de",
+          "// la base: la peticion era correcta, el objetivo era real.",
+          "//",
+          "// Ahora la regla es que la bateria solo toca lo que ella misma ha",
+          "// creado. Si el id que necesita una peticion sigue vacio, es que",
+          "// nada en esta corrida lo lleno, y la peticion se salta.",
+          "const url = pm.request.url.toString();",
+          "const pendiente = (url.match(/{{(\\\\w+)}}/g) || [])",
+          "    .map(v => v.slice(2, -2))",
+          "    .find(v => !pm.collectionVariables.get(v) && v !== 'baseUrl');",
+          "if (pendiente) {",
+          "    console.log(`Se salta ${pm.info.requestName}: falta ${pendiente}.`);",
+          "    pm.execution.skipRequest();",
+          "}",
+          "",
+          "// La fecha de la cita tiene que ser futura y no caer en domingo,",
+          "// o el alta se rechaza con 422 y la prueba falla por el calendario",
+          "// en vez de por la API.",
+          "const d = new Date();",
+          "d.setDate(d.getDate() + 3);",
+          "if (d.getDay() === 0) d.setDate(d.getDate() + 1);",
+          "pm.collectionVariables.set('fechaCita', d.toISOString().slice(0, 10));"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Sistema",
+      "item": [
+        {
+          "name": "Presentación de la API",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Estado del servicio",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/salud",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "salud"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"La base responde\", () => {",
+                  "    pm.expect(pm.response.json().base_datos).to.eql(\"conectada\");",
+                  "});",
+                  "pm.test(\"Cada respuesta trae su identificador\", () => {",
+                  "    // Lo pone el middleware; sirve para encontrar la peticion en el registro.",
+                  "    pm.expect(pm.response.headers.has(\"X-Peticion-Id\")).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Autenticación",
+      "item": [
+        {
+          "name": "Registrar un cliente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "registro"
+              ]
+            },
+            "description": "Alta pública. Siempre con rol de cliente y contraseña hasheada.\n\nDevuelve ya la sesión iniciada: quien acaba de registrarse entra sin\ntener que escribir de nuevo sus credenciales, que es como se comportaba\nel formulario desde el segundo avance.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Prueba\",\n  \"apellido\": \"Postman\",\n  \"tipoDocumento\": \"CC\",\n  \"numeroDocumento\": \"{{documentoNuevo}}\",\n  \"direccion\": \"Calle 1 # 2-3\",\n  \"telefono\": \"3001112233\",\n  \"correo\": \"{{correoNuevo}}\",\n  \"password\": \"Postman2026!\",\n  \"confirmarPassword\": \"Postman2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// 409 es correcto si la coleccion ya se corrio antes: la cuenta existe.",
+                  "pm.test(\"Responde 201 o 409 si ya existia\", () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    // Se guarda para que los PUT y DELETE de usuarios actuen sobre ESTA",
+                  "    // cuenta y no sobre una de verdad.",
+                  "    pm.collectionVariables.set(\"usuarioId\", pm.response.json().usuario.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Iniciar sesión",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Verifica las credenciales y emite un JWT.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correoAdmin}}\",\n  \"password\": \"{{claveAdmin}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Devuelve token y usuario\", () => {",
+                  "    const d = pm.response.json();",
+                  "    pm.expect(d).to.have.property(\"token\");",
+                  "    pm.expect(d.usuario).to.have.property(\"rol\");",
+                  "    pm.collectionVariables.set(\"token\", d.token);",
+                  "    pm.collectionVariables.set(\"rol\", d.usuario.rol);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Perfil propio",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/perfil",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "perfil"
+              ]
+            },
+            "description": "Devuelve el usuario del token. Sirve para revalidar la sesión.\n\nVa dentro del sobre `{usuario: ...}` como el resto de la API, y no suelto:\nel frontend reconstruye la sesión al recargar leyendo `datos.usuario`, así\nque devolverlo pelado dejaba fuera a quien pulsara F5 estando dentro."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"El perfil viene dentro de 'usuario'\", () => {",
+                  "    // El frontend lee datos.usuario; devolverlo suelto cerraba la sesion al",
+                  "    // recargar la pagina, y es un fallo que solo se ve recargando.",
+                  "    pm.expect(pm.response.json()).to.have.property(\"usuario\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Solicitar la recuperación de la contraseña",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/recuperar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "recuperar"
+              ]
+            },
+            "description": "Primer paso: pedir por correo el enlace para volver a entrar.\n\nEl token no vuelve en la respuesta: viaja por correo y solo por correo. Es\nla parte que hace que el flujo signifique algo, porque obliga a demostrar\nque se controla el buzón de la cuenta. Devolverlo aquí convertiría \"olvidé\nmi contraseña\" en \"cámbiale la contraseña a quien yo diga\".\n\nResponde exactamente lo mismo exista o no la cuenta. Si dijera \"ese correo\nno está registrado\", cualquiera podría ir probando direcciones hasta saber\ncuáles tienen cuenta en el atelier.\n\nEl envío se encola como tarea de fondo: hablar con el servidor de correo\npuede tardar segundos y quien rellenó el formulario no tiene por qué\nesperarlos.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correoAdmin}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Restablecer la contraseña con el token recibido",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/restablecer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "restablecer"
+              ]
+            },
+            "description": "Segundo paso: canjear el token por una contraseña nueva."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Productos",
+      "item": [
+        {
+          "name": "Listar el catálogo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "productos"
+              ]
+            },
+            "description": "Consulta pública: el catálogo se ve sin iniciar sesión."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"El catalogo trae vehiculos\", () => {",
+                  "    const d = pm.response.json();",
+                  "    pm.expect(d.productos).to.be.an(\"array\").that.is.not.empty;",
+                  "    const disponible = d.productos.find(p => p.estado === \"disponible\" && p.precio);",
+                  "    pm.expect(disponible, \"hace falta un vehiculo disponible con precio\").to.exist;",
+                  "    pm.collectionVariables.set(\"productoId\", disponible.id);",
+                  "    pm.collectionVariables.set(\"precioProducto\", disponible.precio);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Añadir un vehículo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "productos"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"prueba-postman\",\n  \"marca\": \"MANSORY\",\n  \"modelo\": \"Prueba Postman\",\n  \"familia\": \"gama\",\n  \"base\": \"Unidad de prueba\",\n  \"lema\": \"Creado por la bateria de Postman\",\n  \"descripcion\": \"Vehiculo de prueba que la coleccion crea y borra.\",\n  \"imagen\": \"placeholder.webp\",\n  \"anio\": 2026,\n  \"precio\": 100000000,\n  \"motor\": \"V8\",\n  \"potencia\": \"500 hp\",\n  \"aceleracion\": \"4.0 s\",\n  \"velocidad\": \"300 km/h\",\n  \"transmision\": \"Automatica\",\n  \"traccion\": \"Integral\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Guarda el vehiculo creado para editarlo y borrarlo despues\", () => {",
+                  "    pm.collectionVariables.set(\"productoCreadoId\", pm.response.json().producto.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar por id o slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/productos/{{identificador}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "productos",
+                "{{identificador}}"
+              ]
+            },
+            "description": "Acepta las dos formas de referirse a un vehículo.\n\nEl panel de administración trabaja con identificadores numéricos, pero la\nweb pública enlaza por slug (`/modelos/pugnator-tricolore`). Resolver\nambas aquí evita tener dos rutas que devuelven exactamente lo mismo."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/productos/{{productoCreadoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "productos",
+                "{{productoCreadoId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"precio\": 120000000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Servicios",
+      "item": [
+        {
+          "name": "Listar servicios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/servicios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "servicios"
+              ]
+            },
+            "description": "Consulta pública: hace falta para el formulario de agendar cita."
+          },
+          "response": []
+        },
+        {
+          "name": "Crear un servicio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/servicios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "servicios"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Servicio de prueba\",\n  \"descripcion\": \"Creado por Postman\",\n  \"duracionMin\": 30,\n  \"precio\": 50000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Guarda el servicio creado\", () => {",
+                  "    pm.collectionVariables.set(\"servicioId\", pm.response.json().servicio.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar uno",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/servicios/{{servicioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "servicios",
+                "{{servicioId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/servicios/{{servicioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "servicios",
+                "{{servicioId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"precio\": 60000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Usuarios",
+      "item": [
+        {
+          "name": "Registrar un cliente (misma alta que POST /api/auth/registro)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "registro"
+              ]
+            },
+            "description": "Alta pública de clientes, sin token.\n\nEs la misma función que atiende `POST /api/auth/registro`, expuesta\ntambién aquí porque es la ruta que nombra la lista de chequeo del\nentregable. Se reutiliza el manejador en lugar de copiarlo para que no\npuedan acabar comportándose distinto.\n\nVa declarada antes que `/{usuario_id}` para que \"registro\" no se intente\ninterpretar como un identificador."
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar clientes (para registrar una venta)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios/clientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "clientes"
+              ]
+            },
+            "description": "Selector de comprador para el mostrador.\n\nExiste porque `GET /api/usuarios` es solo del administrador, y quien\nregistra una venta de mostrador es el empleado. Abrirle aquel listado le\ndaria de paso la ficha completa de todo el mundo —direcciones, telefonos,\nlas cuentas del personal— para una tarea que solo necesita saber a quien\nse le registra la venta. Asi que en vez de ampliar el permiso se entrega\nmenos: solo clientes activos, y de cada uno cuatro campos.\n\nVa declarada antes que `/{usuario_id}` para que \"clientes\" no se intente\ninterpretar como un identificador."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Solo devuelve lo justo para elegir comprador\", () => {",
+                  "    const c = pm.response.json().clientes[0];",
+                  "    pm.expect(c).to.have.all.keys(\"id\", \"nombre\", \"apellido\", \"documento\", \"correo\");",
+                  "    pm.collectionVariables.set(\"clienteId\", c.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar usuarios",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "usuarios"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Crear usuario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "usuarios"
+              ]
+            },
+            "description": "Alta desde el panel: aquí sí se puede elegir el rol."
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar uno",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Activar o inactivar",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios/{{usuarioId}}/estado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "{{usuarioId}}",
+                "estado"
+              ]
+            },
+            "description": "Se prefiere inactivar a borrar: conserva el histórico de citas."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Citas",
+      "item": [
+        {
+          "name": "Franjas libres de un día",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/citas/disponibilidad",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "citas",
+                "disponibilidad"
+              ]
+            },
+            "description": "Consulta pública: el formulario la usa antes de pedir iniciar sesión."
+          },
+          "response": []
+        },
+        {
+          "name": "Contadores por estado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/citas/resumen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "citas",
+                "resumen"
+              ]
+            },
+            "description": "Un cliente ve el resumen de sus citas; el personal, el de todas."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar citas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/citas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "citas"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Agendar una cita",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/citas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "citas"
+              ]
+            },
+            "description": "El dueño de la cita sale del token, nunca del cuerpo de la petición.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": 1,\n  \"productoId\": \"{{productoId}}\",\n  \"fecha\": \"{{fechaCita}}\",\n  \"hora\": \"10:00:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Guarda la cita para reprogramarla y borrarla despues\", () => {",
+                  "    pm.collectionVariables.set(\"citaId\", pm.response.json().cita.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar una cita",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/citas/{{citaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "citas",
+                "{{citaId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Reprogramar",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/citas/{{citaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "citas",
+                "{{citaId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Cambiar estado",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/citas/{{citaId}}/estado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "citas",
+                "{{citaId}}",
+                "estado"
+              ]
+            },
+            "description": "Confirmar y completar son del personal; un cliente solo puede cancelar\nla suya."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Ventas",
+      "item": [
+        {
+          "name": "Cifras de cabecera",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ventas/resumen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ventas",
+                "resumen"
+              ]
+            },
+            "description": "Un cliente ve el resumen de sus compras; el personal, el del negocio."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar ventas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ventas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ventas"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Viene paginado y el total no es el de la pagina\", () => {",
+                  "    const d = pm.response.json();",
+                  "    pm.expect(d).to.have.property(\"pagina\");",
+                  "    pm.expect(d.pagina.total).to.eql(d.total);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar una venta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ventas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ventas"
+              ]
+            },
+            "description": "Registra la venta y marca como vendidos los vehículos incluidos.\n\nUn cliente compra a su nombre: si envía `usuarioId`, se rechaza. Solo el\npersonal puede vender a nombre de otra persona, y solo el personal puede\nfijar el precio de una línea; para todos los demás, el precio lo pone el\ncatálogo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usuarioId\": \"{{clienteId}}\",\n  \"lineas\": [\n    {\n      \"productoId\": \"{{productoId}}\",\n      \"cantidad\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"El precio sale del catalogo, no del cuerpo\", () => {",
+                  "    const v = pm.response.json().venta;",
+                  "    pm.expect(v.lineas[0].precioUnitario)",
+                  "      .to.eql(Number(pm.collectionVariables.get(\"precioProducto\")));",
+                  "});",
+                  "pm.test(\"El total lleva el IVA del 19%\", () => {",
+                  "    const v = pm.response.json().venta;",
+                  "    pm.expect(v.total).to.be.closeTo(v.subtotal * 1.19, 1);",
+                  "});",
+                  "pm.test(\"El consecutivo no es el provisional\", () => {",
+                  "    const v = pm.response.json().venta;",
+                  "    pm.expect(v.numero).to.match(/^V-\\d{4}-\\d{5}$/);",
+                  "    pm.collectionVariables.set(\"ventaId\", v.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar una venta",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ventas/{{ventaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ventas",
+                "{{ventaId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Cambiar el estado",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ventas/{{ventaId}}/estado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ventas",
+                "{{ventaId}}",
+                "estado"
+              ]
+            },
+            "description": "Marcar pagada o anular. Anular devuelve los vehículos al catálogo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"pagada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Facturas",
+      "item": [
+        {
+          "name": "Listar facturas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/facturas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "facturas"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Emitir la factura de una venta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/facturas/venta/{{ventaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "facturas",
+                "venta",
+                "{{ventaId}}"
+              ]
+            },
+            "description": "Una venta, una factura. Reintentarlo responde 409, no una segunda."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"La factura copia el detalle de la venta\", () => {",
+                  "    const f = pm.response.json().factura;",
+                  "    pm.expect(f.lineas).to.be.an(\"array\").that.is.not.empty;",
+                  "    pm.expect(f.numero).to.match(/^F-\\d{4}-\\d{5}$/);",
+                  "    pm.collectionVariables.set(\"facturaId\", f.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar una factura",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/facturas/{{facturaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "facturas",
+                "{{facturaId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Anular una factura",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/facturas/{{facturaId}}/anular",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "facturas",
+                "{{facturaId}}",
+                "anular"
+              ]
+            },
+            "description": "Una factura se anula, no se borra.\n\nBorrarla dejaría un hueco en el consecutivo, y un consecutivo con huecos\nno sirve para lo único que hace falta: demostrar que no falta ninguna.\nPor eso no hay DELETE en este router."
+          },
+          "response": []
+        },
+        {
+          "name": "Descargar la factura en PDF",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/facturas/{{facturaId}}/pdf",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "facturas",
+                "{{facturaId}}",
+                "pdf"
+              ]
+            },
+            "description": "El cliente descarga la suya; el personal, cualquiera.\n\nEl PDF se arma en memoria y se devuelve en la misma respuesta: guardarlo\nen disco obligaria a decidir donde, a limpiarlo despues y a confiar en un\ndisco que en Render es efimero y desaparece con cada despliegue."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Es un PDF de verdad\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/pdf\");",
+                  "    // %PDF- son los cinco primeros bytes de cualquier PDF.",
+                  "    pm.expect(pm.response.text().slice(0, 5)).to.eql(\"%PDF-\");",
+                  "});",
+                  "pm.test(\"Se descarga con nombre\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Disposition\")).to.include(\"attachment\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reportes",
+      "item": [
+        {
+          "name": "Cifras del tablero administrativo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes/panel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reportes",
+                "panel"
+              ]
+            },
+            "description": "Reservado al personal: son cifras de todo el negocio, no de una cuenta."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Trae las ocho cifras del negocio\", () => {",
+                  "    pm.expect(Object.keys(pm.response.json().panel)).to.have.lengthOf(8);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reporte de ventas del periodo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes/ventas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reportes",
+                "ventas"
+              ]
+            },
+            "description": "Sin fechas devuelve el reporte diario, que es el que se pide a diario."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Sin fechas, el reporte es el de hoy\", () => {",
+                  "    const r = pm.response.json().reporte;",
+                  "    pm.expect(r.rango.dias).to.eql(1);",
+                  "    pm.expect(r.porDia).to.have.lengthOf(1);",
+                  "});",
+                  "pm.test(\"Dice de quien son las cifras\", () => {",
+                  "    pm.expect(pm.response.json().reporte.alcance).to.be.a(\"string\").that.is.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Descargar el reporte en PDF",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes/ventas/pdf",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reportes",
+                "ventas",
+                "pdf"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Descargar el reporte en Excel",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reportes/ventas/excel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reportes",
+                "ventas",
+                "excel"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Es un libro de Excel\", () => {",
+                  "    // Un .xlsx es un zip: empieza por PK.",
+                  "    pm.expect(pm.response.text().slice(0, 2)).to.eql(\"PK\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PQR",
+      "item": [
+        {
+          "name": "Contadores por estado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/pqr/resumen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pqr",
+                "resumen"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Listar PQR",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/pqr",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pqr"
+              ]
+            },
+            "description": "Para el personal es una bandeja de trabajo, así que lo pendiente va\nprimero; para un cliente, la lista de lo que ha radicado."
+          },
+          "response": []
+        },
+        {
+          "name": "Radicar una PQR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/pqr",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pqr"
+              ]
+            },
+            "description": "Quien radica sale del token. El estado y el número los pone el sistema.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"reclamo\",\n  \"asunto\": \"Prueba desde Postman\",\n  \"descripcion\": \"Descripcion de prueba con mas de veinte caracteres.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Nace pendiente y con radicado\", () => {",
+                  "    const p = pm.response.json().pqr;",
+                  "    pm.expect(p.estado).to.eql(\"pendiente\");",
+                  "    pm.expect(p.numero).to.match(/^P-\\d{4}-\\d{5}$/);",
+                  "    pm.collectionVariables.set(\"pqrId\", p.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar una PQR",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/pqr/{{pqrId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pqr",
+                "{{pqrId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Responder",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/pqr/{{pqrId}}/responder",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pqr",
+                "{{pqrId}}",
+                "responder"
+              ]
+            },
+            "description": "Deja la respuesta y quién la firmó. Una PQR cerrada ya no se responde.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"respuesta\": \"Respuesta de prueba enviada desde Postman.\",\n  \"estado\": \"respondida\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cambiar el estado",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/pqr/{{pqrId}}/estado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pqr",
+                "{{pqrId}}",
+                "estado"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"cerrada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Asistente",
+      "item": [
+        {
+          "name": "¿Está disponible el asistente?",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/chat/estado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chat",
+                "estado"
+              ]
+            },
+            "description": "Lo consulta el frontend antes de pintar el chat.\n\nSin clave configurada, la respuesta es que no está disponible en lugar de\nun error: el resto del sitio funciona igual y el widget puede ofrecer la\nPQR como alternativa sin que nadie vea una pantalla rota."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Dice si el asistente esta disponible\", () => {",
+                  "    pm.expect(pm.response.json()).to.have.property(\"disponible\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Abrir una conversación",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chat/conversaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chat",
+                "conversaciones"
+              ]
+            },
+            "description": "Con sesión, la conversación queda asociada a la cuenta y se recupera\ndespués. Sin sesión, vive mientras dure la pestaña.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Prueba Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Guarda el hilo\", () => {",
+                  "    pm.collectionVariables.set(\"conversacionId\", pm.response.json().conversacion.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mis conversaciones",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chat/conversaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chat",
+                "conversaciones"
+              ]
+            },
+            "description": "Solo con sesión: un visitante no tiene lista que consultar."
+          },
+          "response": []
+        },
+        {
+          "name": "Escribir al asistente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chat/conversaciones/{{conversacionId}}/mensajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chat",
+                "conversaciones",
+                "{{conversacionId}}",
+                "mensajes"
+              ]
+            },
+            "description": "Guarda la pregunta, consulta al modelo y guarda la respuesta.\n\nLa pregunta se guarda ANTES de llamar al proveedor. Si el modelo falla, el\nmensaje de quien escribió no se pierde: la conversación queda con su\npregunta y se puede reintentar sin volver a escribirla.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contenido\": \"Que vehiculos tienen disponibles?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Leer una conversación",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chat/conversaciones/{{conversacionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chat",
+                "conversaciones",
+                "{{conversacionId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Casos que deben fallar",
+      "description": "Lo que NO debe poder hacerse. Una bateria que solo prueba el camino feliz no detecta que se cayo una comprobacion de permisos: el endpoint sigue respondiendo 200, solo que a quien no debia.",
+      "item": [
+        {
+          "name": "Sin token -> 401 con WWW-Authenticate",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ventas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ventas"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Dice como autenticarse\", () => {",
+                  "    // La norma HTTP lo exige; sin eso, un cliente generico no sabe que debe",
+                  "    // pedir un token en vez de rendirse.",
+                  "    pm.expect(pm.response.headers.get(\"WWW-Authenticate\")).to.eql(\"Bearer\");",
+                  "});",
+                  "pm.test(\"El error trae el formato de la API\", () => {",
+                  "    const d = pm.response.json();",
+                  "    pm.expect(d).to.have.all.keys(\"codigo\", \"mensaje\", \"ruta\", \"detalles\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Token invalido -> 401",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer basura"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ventas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ventas"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Vender sin lineas -> 422 diciendo que campo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ventas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ventas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lineas\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Senala el campo, no solo que algo fallo\", () => {",
+                  "    const d = pm.response.json();",
+                  "    pm.expect(d.detalles).to.be.an(\"array\").that.is.not.empty;",
+                  "    pm.expect(d.detalles[0]).to.have.all.keys(\"campo\", \"problema\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Vender el mismo vehiculo dos veces -> 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ventas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ventas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lineas\": [\n    {\n      \"productoId\": \"{{productoId}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Con el codigo del dominio\", () => {",
+                  "    pm.expect(pm.response.json().codigo).to.eql(\"vehiculo_no_disponible\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Facturar dos veces la misma venta -> 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/facturas/venta/{{ventaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "facturas",
+                "venta",
+                "{{ventaId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Una venta, una factura\", () => {",
+                  "    pm.expect(pm.response.json().codigo).to.eql(\"venta_ya_facturada\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Borrar una venta ya facturada -> 409",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ventas/{{ventaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ventas",
+                "{{ventaId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"El consecutivo no puede quedar con huecos\", () => {",
+                  "    pm.expect(pm.response.json().codigo).to.eql(\"venta_con_factura\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Pedir mas filas de la cuenta -> 422",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ventas?porPagina=5000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ventas"
+              ],
+              "query": [
+                {
+                  "key": "porPagina",
+                  "value": "5000"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Limpieza",
+      "description": "Borra lo que creo la corrida. Va al final para que las carpetas anteriores encuentren lo que necesitan.\n\nLa venta puede quedarse: si se le emitio factura, borrarla dejaria un hueco en el consecutivo, y la API lo impide a proposito. Contra el despliegue, conviene quitarla a mano de vez en cuando.",
+      "item": [
+        {
+          "name": "Eliminar",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/productos/{{productoCreadoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "productos",
+                "{{productoCreadoId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204 sin cuerpo, o 200\", () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/servicios/{{servicioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "servicios",
+                "{{servicioId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204 sin cuerpo, o 200\", () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/usuarios/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "usuarios",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204 sin cuerpo, o 200\", () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/citas/{{citaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "citas",
+                "{{citaId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204 sin cuerpo, o 200\", () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar una venta",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ventas/{{ventaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ventas",
+                "{{ventaId}}"
+              ]
+            },
+            "description": "Borra el registro por completo. Lo normal es anular, no borrar: una\nventa anulada sigue contando en el histórico y esta desaparece.\n\nDevuelve 204 sin cuerpo, que es lo que significa «hecho, y no hay nada\nque contarte»: el recurso ya no está, así que no hay nada que devolver."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Se borra, o se explica por que no\", () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([204, 409]);",
+                  "    if (pm.response.code === 409) {",
+                  "        pm.expect(pm.response.json().codigo).to.eql('venta_con_factura');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar una PQR",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/pqr/{{pqrId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pqr",
+                "{{pqrId}}"
+              ]
+            },
+            "description": "Reservado al administrador. Lo normal es cerrarla, no borrarla: un\ncanal de quejas que permite hacer desaparecer una queja no sirve de\ncanal de quejas."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204 sin cuerpo, o 200\", () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Borrar una conversación",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chat/conversaciones/{{conversacionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chat",
+                "conversaciones",
+                "{{conversacionId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204 sin cuerpo, o 200\", () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

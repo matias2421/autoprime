@@ -2,7 +2,7 @@
 
 from uuid import uuid4
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.tiempo import hoy
@@ -64,8 +64,16 @@ async def listar(
     consulta = _filtrar(select(Pqr), usuario_id, estado, tipo)
 
     # Lo pendiente primero: es una bandeja de trabajo, no un archivo. Ordenar
-    # solo por fecha enterraría un reclamo sin atender bajo veinte cerrados.
-    orden_estado = func.field(Pqr.estado, "pendiente", "en_proceso", "respondida")
+    # solo por fecha enterraria un reclamo sin atender bajo veinte cerrados.
+    #
+    # Con `case` y no con `FIELD()`, que solo existe en MySQL: el orden queda
+    # escrito de forma que cualquier motor lo entienda.
+    orden_estado = case(
+        (Pqr.estado == "pendiente", 0),
+        (Pqr.estado == "en_proceso", 1),
+        (Pqr.estado == "respondida", 2),
+        else_=3,
+    )
     consulta = consulta.order_by(orden_estado, Pqr.creado_en.desc())
 
     if limite is not None:
@@ -121,12 +129,16 @@ async def eliminar(sesion: AsyncSession, registro: Pqr) -> None:
 
 async def resumen(sesion: AsyncSession, usuario_id: int | None = None) -> dict:
     """Los cinco contadores en una sola consulta, calculados por la base."""
+
+    def contar_si(estado: str):
+        return func.sum(case((Pqr.estado == estado, 1), else_=0))
+
     columnas = (
         func.count(Pqr.id),
-        func.sum(func.if_(Pqr.estado == "pendiente", 1, 0)),
-        func.sum(func.if_(Pqr.estado == "en_proceso", 1, 0)),
-        func.sum(func.if_(Pqr.estado == "respondida", 1, 0)),
-        func.sum(func.if_(Pqr.estado == "cerrada", 1, 0)),
+        contar_si("pendiente"),
+        contar_si("en_proceso"),
+        contar_si("respondida"),
+        contar_si("cerrada"),
     )
     fila = (await sesion.execute(_filtrar(select(*columnas), usuario_id))).one()
     total, pendientes, en_proceso, respondidas, cerradas = fila

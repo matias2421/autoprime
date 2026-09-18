@@ -20,7 +20,7 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import uuid4
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.tiempo import fin_del_dia, hoy, inicio_del_dia
@@ -298,13 +298,19 @@ async def resumen(
     para devolver seis números. Contar y sumar es exactamente lo que MySQL
     hace sin mover las filas a ninguna parte.
     """
+    # `case` y no `IF()`: aquel es de MySQL y de nadie mas, y ata el reporte
+    # al motor. Con `CASE WHEN`, que es estandar, la misma consulta corre en
+    # SQLite y las pruebas no necesitan una base de verdad detras.
+    def contar_si(estado: str):
+        return func.sum(case((Venta.estado == estado, 1), else_=0))
+
     columnas = (
         func.count(Venta.id),
-        func.sum(func.if_(Venta.estado == "pendiente", 1, 0)),
-        func.sum(func.if_(Venta.estado == "pagada", 1, 0)),
-        func.sum(func.if_(Venta.estado == "anulada", 1, 0)),
-        # Ingresos es lo cobrado: una venta anulada no ingresó nada.
-        func.sum(func.if_(Venta.estado == "pagada", Venta.total, 0)),
+        contar_si("pendiente"),
+        contar_si("pagada"),
+        contar_si("anulada"),
+        # Ingresos es lo cobrado: una venta anulada no ingreso nada.
+        func.sum(case((Venta.estado == "pagada", Venta.total), else_=0)),
     )
     consulta = _filtrar(select(*columnas), usuario_id, None, desde, hasta)
     total, pendientes, pagadas, anuladas, ingresos = (

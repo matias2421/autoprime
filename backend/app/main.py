@@ -249,7 +249,7 @@ def _sin_permiso(peticion: Request, error: PermisoDenegado):
 @app.exception_handler(DatosInvalidos)
 def _datos_invalidos(peticion: Request, error: DatosInvalidos):
     return _respuesta(
-        status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
         error.codigo,
         error.mensaje,
         peticion.url.path,
@@ -279,7 +279,7 @@ def _validacion(peticion: Request, error: RequestValidationError):
         for fallo in error.errors()
     ]
     return _respuesta(
-        status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
         "datos_invalidos",
         "Los datos enviados no cumplen el formato esperado.",
         peticion.url.path,

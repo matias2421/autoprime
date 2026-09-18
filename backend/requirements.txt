@@ -50,5 +50,11 @@ httpx==0.28.1
 tzdata==2026.4
 
 # Pruebas.
+#
+# aiosqlite deja correr la suite contra una base en memoria: sin servidor,
+# sin MySQL y sin limpieza entre pruebas. Cubre la logica; lo que NO cubre
+# -tipos ENUM, claves ajenas reales, que el esquema tenga las columnas que
+# el modelo declara- lo cubre pruebas_api.py contra MySQL de verdad.
 pytest==9.1.1
 pytest-asyncio==1.4.0
+aiosqlite==0.22.1

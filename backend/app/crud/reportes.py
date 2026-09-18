@@ -13,7 +13,7 @@ Python lo que la base ya puede entregar ordenado es trabajo repetido, y el
 
 from datetime import date, timedelta
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.tiempo import fin_del_dia, hoy, inicio_del_dia
@@ -62,7 +62,7 @@ async def serie_diaria(
     consulta = select(
         dia,
         func.count(Venta.id),
-        func.sum(func.if_(Venta.estado == "pagada", Venta.total, 0)),
+        func.sum(case((Venta.estado == "pagada", Venta.total), else_=0)),
     ).where(Venta.estado.in_(ESTADOS_VIVOS))
     consulta = _en_rango(consulta, desde, hasta)
     if usuario_id is not None:
@@ -216,7 +216,7 @@ async def panel_administrativo(sesion: AsyncSession) -> dict:
             select(
                 func.count(Venta.id),
                 func.coalesce(
-                    func.sum(func.if_(Venta.estado == "pagada", Venta.total, 0)), 0
+                    func.sum(case((Venta.estado == "pagada", Venta.total), else_=0)), 0
                 ),
             ).where(Venta.fecha >= inicio_hoy)
         )

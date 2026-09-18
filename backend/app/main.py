@@ -6,7 +6,9 @@ frontend en React apenas cambia.
 """
 
 import logging
+import time
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -14,7 +16,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from app.core.base_datos import comprobar_conexion
+from app.core import asistente
+from app.core.base_datos import comprobar_conexion, motor
 from app.core.configuracion import configuracion
 from app.errores import (
     ConflictoDeNegocio,
@@ -22,6 +25,7 @@ from app.errores import (
     ErrorDeDominio,
     NoAutenticado,
     PermisoDenegado,
+    DemasiadasPeticiones,
     RecursoNoEncontrado,
     ServicioExternoCaido,
 )
@@ -29,8 +33,10 @@ from app.dependencias import SesionDep
 from app.models import autoprime  # noqa: F401 — registra las tablas en Base
 from app.routers import (
     auth,
+    chat,
     citas,
     facturas,
+    pqr,
     productos,
     reportes,
     servicios,
@@ -44,6 +50,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger("autoprime")
 
+# A partir de aqui una peticion se considera lenta y se anota. Medio
+# segundo es mucho para una consulta y poco para armar un PDF de un mes,
+# que es justo lo que se quiere ver en el registro.
+UMBRAL_LENTO = 0.5
+
 TAGS = [
     {"name": "Autenticación", "description": "Registro, inicio de sesión y perfil."},
     {"name": "Usuarios", "description": "Gestión de cuentas y roles."},
@@ -53,8 +64,49 @@ TAGS = [
     {"name": "Ventas", "description": "Registro de ventas y su detalle."},
     {"name": "Facturas", "description": "Emisión y consulta de facturas."},
     {"name": "Reportes", "description": "Tableros y descargas en PDF y Excel."},
+    {"name": "PQR", "description": "Peticiones, quejas, reclamos y sugerencias."},
+    {"name": "Asistente", "description": "Chat con el asistente virtual."},
     {"name": "Sistema", "description": "Estado del servicio."},
 ]
+
+
+@asynccontextmanager
+async def ciclo_de_vida(aplicacion: FastAPI):
+    """Lo que se abre al arrancar y se cierra al apagar.
+
+    El resumen de arranque no es decoración. La mitad de los fallos de un
+    despliegue son «faltaba una variable de entorno», y eso se descubre —si
+    no se dice aquí— cuando alguien intenta recuperar su contraseña y no le
+    llega nada. Decirlo en la primera línea del registro convierte media hora
+    de búsqueda en una ojeada.
+
+    El cierre importa por la razón contraria: sin soltar el pool de la base y
+    el cliente HTTP, al apagar quedan conexiones a medio cerrar y el registro
+    se llena de errores del recolector que no significan nada y esconden los
+    que sí.
+    """
+    # Separador ASCII: la consola de Windows no dibuja el punto medio y lo
+    # sustituye por un interrogante en la primera linea del registro.
+    logger.info("%s %s | entorno: %s", configuracion.nombre_app,
+                configuracion.version, configuracion.entorno)
+    logger.info("Origenes permitidos: %s", ", ".join(configuracion.origenes))
+    logger.info(
+        "Correo saliente: %s",
+        configuracion.smtp_host or "sin configurar (los enlaces van al registro)",
+    )
+    logger.info(
+        "Asistente: %s",
+        f"activo con {configuracion.groq_modelo}"
+        if asistente.disponible()
+        else "sin clave (el chat ofrecera la PQR como alternativa)",
+    )
+
+    yield
+
+    await asistente.cerrar()
+    await motor.dispose()
+    logger.info("Conexiones cerradas. Hasta luego.")
+
 
 app = FastAPI(
     title=configuracion.nombre_app,
@@ -66,7 +118,57 @@ app = FastAPI(
     openapi_tags=TAGS,
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=ciclo_de_vida,
 )
+
+# --------------------------- Middleware propio ------------------------------
+#
+# Corre alrededor de TODA petición, incluidas las que ni siquiera llegan a un
+# endpoint —una ruta que no existe, un cuerpo que no valida—. Ahí está su
+# utilidad: es el único sitio desde el que se ve lo que realmente entra.
+
+
+@app.middleware("http")
+async def registrar_peticion(peticion: Request, siguiente):
+    """Marca cada petición y mide lo que tarda.
+
+    Dos problemas concretos resuelve.
+
+    El primero: cuando algo falla en producción, el registro tiene veinte
+    líneas de cuatro peticiones entrelazadas y no hay forma de saber cuáles
+    van juntas. Con un identificador por petición, sí: se filtra por él y
+    queda solo su historia. El mismo identificador viaja en la respuesta, así
+    que quien reporta un fallo puede decir cuál fue el suyo.
+
+    El segundo: sin medir, «va lento» es una opinión. Con el tiempo en cada
+    respuesta y un aviso automático al pasar del umbral, es un dato y además
+    señala qué endpoint concreto.
+    """
+    identificador = uuid.uuid4().hex[:8]
+    peticion.state.identificador = identificador
+
+    comienzo = time.perf_counter()
+    respuesta = await siguiente(peticion)
+    duracion = time.perf_counter() - comienzo
+
+    respuesta.headers["X-Peticion-Id"] = identificador
+    respuesta.headers["X-Tiempo-Respuesta"] = f"{duracion * 1000:.0f}ms"
+
+    # Solo se registra lo que merece mirarse: los errores y lo que tarda. Un
+    # registro que anota los doscientos GET que van bien es un registro que
+    # nadie lee, y entonces tampoco se leen las líneas que importan.
+    if respuesta.status_code >= 400 or duracion > UMBRAL_LENTO:
+        logger.info(
+            "[%s] %s %s -> %s en %.0f ms",
+            identificador,
+            peticion.method,
+            peticion.url.path,
+            respuesta.status_code,
+            duracion * 1000,
+        )
+
+    return respuesta
+
 
 # El frontend de Vite corre en otro puerto, así que toda petición del
 # navegador es de origen cruzado y necesita esta autorización explícita.
@@ -76,6 +178,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
+    # Sin exponerlas, el navegador se las oculta a JavaScript por venir de
+    # otro origen, y el identificador que sirve para reportar un fallo no
+    # llegaria nunca a quien tiene el fallo delante.
+    expose_headers=["Content-Disposition", "X-Peticion-Id", "Retry-After"],
 )
 
 
@@ -181,6 +287,23 @@ def _validacion(peticion: Request, error: RequestValidationError):
     )
 
 
+@app.exception_handler(DemasiadasPeticiones)
+def _demasiadas(peticion: Request, error: DemasiadasPeticiones):
+    """429 con `Retry-After`.
+
+    Sin esa cabecera, quien llama solo sabe que le dijeron que no, y lo que
+    hace entonces es reintentar de inmediato: el freno acaba generando más
+    peticiones de las que evita.
+    """
+    return _respuesta(
+        status.HTTP_429_TOO_MANY_REQUESTS,
+        error.codigo,
+        error.mensaje,
+        peticion.url.path,
+        cabeceras={"Retry-After": str(error.espera)},
+    )
+
+
 @app.exception_handler(ServicioExternoCaido)
 def _servicio_externo(peticion: Request, error: ServicioExternoCaido):
     """503, no 500: el fallo no es nuestro y reintentar puede funcionar."""
@@ -266,6 +389,8 @@ app.include_router(citas.router)
 app.include_router(ventas.router)
 app.include_router(facturas.router)
 app.include_router(reportes.router)
+app.include_router(pqr.router)
+app.include_router(chat.router)
 
 
 @app.get("/", tags=["Sistema"], summary="Presentación de la API")
@@ -284,6 +409,8 @@ async def raiz():
             "ventas": "/api/ventas",
             "facturas": "/api/facturas",
             "reportes": "/api/reportes",
+            "pqr": "/api/pqr",
+            "chat": "/api/chat",
         },
     }
 

@@ -131,6 +131,23 @@ class PqrNoModificable(ConflictoDeNegocio):
         super().__init__(f"Una PQR en estado '{estado}' ya está cerrada.")
 
 
+class DemasiadasPeticiones(ErrorDeDominio):
+    """Se superó el cupo de peticiones por minuto. → 429
+
+    No es un conflicto de datos ni un fallo del servidor: la petición está
+    bien y volverá a funcionar sola. Por eso lleva su propio código y su
+    propia espera, que viaja en la cabecera `Retry-After`.
+    """
+
+    codigo = "demasiadas_peticiones"
+
+    def __init__(self, espera: int):
+        self.espera = espera
+        super().__init__(
+            f"Vas muy rápido. Espera {espera} segundos y vuelve a escribir."
+        )
+
+
 class ServicioExternoCaido(ErrorDeDominio):
     """Un proveedor de fuera no respondió o respondió mal. → 503
 

@@ -7,10 +7,12 @@ a tocar ni un componente de React.
 """
 
 from app.schemas.cita import CitaSalida, FranjaDisponible, ResumenCitas
+from app.schemas.chat import ConversacionSalida, RespuestaChat
 from app.schemas.comunes import Esquema
 from app.schemas.factura import FacturaSalida
 from app.schemas.paginacion import Pagina
 from app.schemas.producto import ProductoSalida
+from app.schemas.pqr import PqrSalida, ResumenPqr
 from app.schemas.servicio import ServicioSalida
 from app.schemas.usuario import UsuarioSalida
 from app.schemas.venta import ResumenVentas, VentaSalida
@@ -89,3 +91,33 @@ class SobreFacturas(Esquema):
 
 class SobreFactura(Esquema):
     factura: FacturaSalida
+
+
+class SobrePqrs(Esquema):
+    # La clave va en singular porque «PQR» ya es plural: son peticiones,
+    # quejas y reclamos. «pqrs» seria un plural de un plural.
+    pqr: list[PqrSalida]
+    total: int
+    pagina: Pagina
+
+
+class SobrePqr(Esquema):
+    pqr: PqrSalida
+
+
+class SobreResumenPqr(Esquema):
+    resumen: ResumenPqr
+
+
+class SobreConversaciones(Esquema):
+    conversaciones: list[ConversacionSalida]
+    total: int
+    pagina: Pagina
+
+
+class SobreConversacion(Esquema):
+    conversacion: ConversacionSalida
+
+
+class SobreChat(Esquema):
+    chat: RespuestaChat

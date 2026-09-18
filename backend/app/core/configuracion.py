@@ -86,6 +86,39 @@ class Configuracion(BaseSettings):
     smtp_password: str = ""
     smtp_remitente: str = ""
 
+    # --- Asistente (Groq) ---
+    #
+    # La clave NO tiene valor por defecto ni aparece en el codigo: se lee del
+    # entorno y punto. Si falta, el chat responde que el asistente no esta
+    # disponible y ofrece dejar una PQR; el resto de la API sigue funcionando.
+    # Es la diferencia entre una funcion que se degrada y un despliegue que
+    # no arranca.
+    #
+    # Groq habla el mismo protocolo que OpenAI, asi que la URL es lo unico
+    # que cambia si algun dia se sustituye el proveedor.
+    groq_api_key: str = ""
+    groq_url: str = "https://api.groq.com/openai/v1/chat/completions"
+    groq_modelo: str = "openai/gpt-oss-20b"
+
+    # Un modelo que tarda mas de esto ya perdio la conversacion: mas vale
+    # decir que no esta disponible que dejar a alguien mirando tres puntos.
+    groq_timeout: float = 20.0
+
+    # Techo de la respuesta. Un chat de atencion no necesita ensayos.
+    groq_max_tokens: int = 700
+
+    # Cuantos mensajes previos se le reenvian al modelo. El historial entero
+    # crece sin limite y cada peticion lo paga entero; con los ultimos basta
+    # para que la conversacion tenga sentido.
+    mensajes_de_contexto: int = 10
+
+    # --- Servicios externos ---
+    #
+    # Calendario de festivos de Colombia. Se usa para no ofrecer citas en
+    # dias en que el taller no abre.
+    url_festivos: str = "https://date.nager.at/api/v3/PublicHolidays"
+    festivos_timeout: float = 8.0
+
     # ------------------------------------------------------------------
     @property
     def origenes(self) -> list[str]:

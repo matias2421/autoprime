@@ -13,14 +13,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base_datos import obtener_sesion
 from app.core.seguridad import TIPO_SESION, JWTError, decodificar_token
+from app.crud import chat as crud_chat
 from app.crud import citas as crud_citas
 from app.crud import facturas as crud_facturas
+from app.crud import pqr as crud_pqr
 from app.crud import productos as crud_productos
 from app.crud import servicios as crud_servicios
 from app.crud import usuarios as crud_usuarios
 from app.crud import ventas as crud_ventas
 from app.errores import NoAutenticado, PermisoDenegado
-from app.models.autoprime import Cita, Factura, Producto, Servicio, Usuario, Venta
+from app.models.autoprime import (
+    Cita,
+    Conversacion,
+    Factura,
+    Producto,
+    Pqr,
+    Servicio,
+    Usuario,
+    Venta,
+)
 
 # --- Sesión de base de datos ---
 SesionDep = Annotated[AsyncSession, Depends(obtener_sesion)]
@@ -69,6 +80,33 @@ async def usuario_actual(
 
 
 UsuarioActual = Annotated[Usuario, Depends(usuario_actual)]
+
+
+async def usuario_opcional(
+    sesion: SesionDep,
+    credenciales: Annotated[
+        HTTPAuthorizationCredentials | None, Depends(esquema_bearer)
+    ],
+) -> Usuario | None:
+    """Identifica a quien traiga token válido; a los demás los deja pasar.
+
+    Es para el chat, que atiende también a quien todavía no tiene cuenta: es
+    lo primero que ve un visitante y exigirle registro antes de preguntar un
+    precio es perder la conversación.
+
+    Un token roto o caducado NO da error aquí: se trata como si no hubiera
+    ninguno. Devolver 401 dejaría a alguien sin poder escribir en el chat
+    solo porque le caducó la sesión en otra pestaña.
+    """
+    if credenciales is None:
+        return None
+    try:
+        return await usuario_actual(sesion, credenciales)
+    except NoAutenticado:
+        return None
+
+
+UsuarioOpcional = Annotated[Usuario | None, Depends(usuario_opcional)]
 
 
 # --- Autorización por rol ---
@@ -131,9 +169,23 @@ async def obtener_factura_ruta(
     return await crud_facturas.obtener_o_fallar(sesion, factura_id)
 
 
+async def obtener_pqr_ruta(
+    sesion: SesionDep, pqr_id: Annotated[int, Path(ge=1)]
+) -> Pqr:
+    return await crud_pqr.obtener_o_fallar(sesion, pqr_id)
+
+
+async def obtener_conversacion_ruta(
+    sesion: SesionDep, conversacion_id: Annotated[int, Path(ge=1)]
+) -> Conversacion:
+    return await crud_chat.obtener_o_fallar(sesion, conversacion_id)
+
+
 UsuarioRuta = Annotated[Usuario, Depends(obtener_usuario_ruta)]
 ProductoRuta = Annotated[Producto, Depends(obtener_producto_ruta)]
 ServicioRuta = Annotated[Servicio, Depends(obtener_servicio_ruta)]
 CitaRuta = Annotated[Cita, Depends(obtener_cita_ruta)]
 VentaRuta = Annotated[Venta, Depends(obtener_venta_ruta)]
 FacturaRuta = Annotated[Factura, Depends(obtener_factura_ruta)]
+PqrRuta = Annotated[Pqr, Depends(obtener_pqr_ruta)]
+ConversacionRuta = Annotated[Conversacion, Depends(obtener_conversacion_ruta)]

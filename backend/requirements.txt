@@ -41,6 +41,14 @@ XlsxWriter==3.2.9
 # bloquear el bucle de eventos, que es justo lo que se gano al pasar a async.
 httpx==0.28.1
 
+# Base de datos de zonas horarias.
+#
+# En Windows no existe ninguna y `zoneinfo` se queda sin zonas; en Linux
+# suele venir con el sistema, pero "suele" no basta para lo que decide a
+# que dia pertenece una venta. Declararla cuesta un paquete y quita la duda
+# en los dos sitios. Ver app/core/tiempo.py.
+tzdata==2026.4
+
 # Pruebas.
 pytest==9.1.1
 pytest-asyncio==1.4.0

@@ -6,10 +6,32 @@ el fichero `.env`, que queda fuera del repositorio. En un servidor no hay
 lo que cambia entre el portátil y el despliegue vive aquí.
 """
 
+import logging
 import ssl
+import tempfile
 from urllib.parse import parse_qsl, quote_plus, urlencode, urlsplit, urlunsplit
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger("autoprime")
+
+# El PEM escrito a disco vive lo que vive el proceso; se guarda aqui para
+# no crear un archivo nuevo en cada conexion.
+_CERTIFICADO_TEMPORAL: str | None = None
+_AVISADO_SIN_CERTIFICADO = False
+
+
+def _avisar_sin_certificado() -> None:
+    """Avisa una vez, no en cada conexion del pool."""
+    global _AVISADO_SIN_CERTIFICADO
+    if _AVISADO_SIN_CERTIFICADO:
+        return
+    _AVISADO_SIN_CERTIFICADO = True
+    logger.warning(
+        "La conexion con la base va cifrada pero SIN verificar el servidor: "
+        "falta el certificado. Pon DB_SSL_CA (ruta) o DB_SSL_CA_CONTENIDO "
+        "(el PEM pegado) para completar la verificacion."
+    )
 
 
 class Configuracion(BaseSettings):
@@ -191,36 +213,110 @@ class Configuracion(BaseSettings):
             (esquema, partes.netloc, partes.path, urlencode(consulta), "")
         )
 
+    # ------------------------------ Cifrado ---------------------------------
+    #
+    # Aqui habia una suposicion, y era falsa. El codigo anterior decia: «sin
+    # certificado no se fuerza nada, el driver negocia TLS de todos modos».
+    # No lo hace. Preguntandoselo a la propia base —`SHOW STATUS LIKE
+    # 'Ssl_cipher'`— el resultado con certificado era TLS_AES_256_GCM_SHA384
+    # y sin el, cadena vacia: EN CLARO.
+    #
+    # Y en Render no se ponia el certificado, porque `ca.pem` es un archivo
+    # local que no viaja al repositorio. Es decir: en el portatil iba cifrado
+    # y en produccion —el unico sitio donde la conexion cruza internet de
+    # verdad, de Oregon a Aiven— viajaban en claro las credenciales y todas
+    # las filas. Justo al reves de lo que hacia falta.
+    #
+    # De ahi las tres reglas de abajo, en orden:
+    #
+    #   1. Con certificado: TLS verificado. Lo mejor, y es lo que se usa
+    #      cuando `DB_SSL_CA` apunta a un archivo o `DB_SSL_CA_CONTENIDO`
+    #      trae el PEM pegado en una variable de entorno.
+    #   2. Sin certificado pero contra un servidor remoto: TLS igualmente,
+    #      sin verificar quien esta al otro lado. No es lo ideal, pero cifra;
+    #      y un despliegue mal configurado tiene que fallar hacia el lado
+    #      seguro, no hacia el comodo.
+    #   3. Contra localhost: sin TLS. El MySQL de XAMPP no lo ofrece, y el
+    #      trafico no sale de la maquina.
+
+    # El PEM pegado tal cual, para proveedores donde no se puede subir un
+    # archivo. Render lo guarda cifrado y no pasa por el repositorio.
+    db_ssl_ca_contenido: str = ""
+
+    @property
+    def es_base_local(self) -> bool:
+        anfitrion = (urlsplit(self.database_url).hostname or self.db_host or "").lower()
+        return anfitrion in ("localhost", "127.0.0.1", "::1", "")
+
+    def _ruta_certificado(self) -> str:
+        """Devuelve la ruta del CA, escribiendo el PEM a disco si hace falta.
+
+        El archivo temporal se crea una sola vez por proceso: hacerlo en cada
+        conexion llenaria el disco del contenedor de copias identicas.
+        """
+        if self.db_ssl_ca:
+            return self.db_ssl_ca
+        if not self.db_ssl_ca_contenido:
+            return ""
+
+        global _CERTIFICADO_TEMPORAL
+        if _CERTIFICADO_TEMPORAL is None:
+            archivo = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".pem", delete=False, encoding="utf-8"
+            )
+            # Algunos paneles pegan el PEM con \\n literales en
+            # vez de saltos de linea de verdad. Sin deshacerlos, el certificado
+            # no parsea y el error habla de ASN.1, no de la variable mal pegada.
+            archivo.write(
+                self.db_ssl_ca_contenido.replace("\\n", "\n")
+            )
+            archivo.close()
+            _CERTIFICADO_TEMPORAL = archivo.name
+        return _CERTIFICADO_TEMPORAL
+
     @property
     def conexion_args(self) -> dict:
-        """Opciones de TLS para el driver asíncrono de la API.
+        """Opciones de TLS para el driver asincrono de la API.
 
         aiomysql y PyMySQL no lo piden igual: PyMySQL acepta rutas sueltas
         (`ssl_ca`, `ssl_verify_cert`) y aiomysql quiere un contexto ya armado.
-        Pasarle a uno lo del otro no da un error claro, así que cada cual
+        Pasarle a uno lo del otro no da un error claro, asi que cada cual
         recibe lo suyo.
         """
-        if not self.db_ssl_ca:
-            # Sin certificado no se fuerza nada: el driver negocia TLS de
-            # todos modos y lo consigue con cualquier proveedor serio.
+        certificado = self._ruta_certificado()
+
+        if certificado:
+            contexto = ssl.create_default_context(cafile=certificado)
+            contexto.check_hostname = True
+            contexto.verify_mode = ssl.CERT_REQUIRED
+            return {"ssl": contexto}
+
+        if self.es_base_local:
             return {}
 
-        contexto = ssl.create_default_context(cafile=self.db_ssl_ca)
-        contexto.check_hostname = True
-        contexto.verify_mode = ssl.CERT_REQUIRED
+        _avisar_sin_certificado()
+        contexto = ssl.create_default_context()
+        contexto.check_hostname = False
+        contexto.verify_mode = ssl.CERT_NONE
         return {"ssl": contexto}
 
     @property
     def conexion_args_sincrona(self) -> dict:
         """Lo mismo, en la forma que entiende PyMySQL, para los scripts."""
-        if not self.db_ssl_ca:
+        certificado = self._ruta_certificado()
+
+        if certificado:
+            return {
+                "ssl_ca": certificado,
+                "ssl_verify_cert": True,
+                "ssl_verify_identity": True,
+            }
+
+        if self.es_base_local:
             return {}
 
-        return {
-            "ssl_ca": self.db_ssl_ca,
-            "ssl_verify_cert": True,
-            "ssl_verify_identity": True,
-        }
+        _avisar_sin_certificado()
+        return {"ssl": {"check_hostname": False}}
 
 
 configuracion = Configuracion()

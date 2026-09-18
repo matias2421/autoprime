@@ -45,6 +45,20 @@ services:
       - key: DATABASE_URL
         sync: false
 
+      # El certificado de Aiven, pegado entero (incluidas las lineas BEGIN y
+      # END). Con el, la conexion queda cifrada Y verificada.
+      #
+      # Sin el, la API sigue cifrando -asi esta hecho desde ahora- pero no
+      # comprueba con quien habla. Antes era peor: sin certificado no cifraba
+      # nada, y en el portatil iba por TLS mientras que en produccion, que es
+      # donde la conexion cruza internet de verdad, viajaba en claro.
+      #
+      # No es un secreto: identifica al servidor, no da acceso. Va aqui y no
+      # en el repositorio solo para que el despliegue no dependa de subir un
+      # archivo a mano.
+      - key: DB_SSL_CA_CONTENIDO
+        sync: false
+
       # La dirección de Vercel, separada por comas si hay varias.
       - key: ORIGENES_PERMITIDOS
         sync: false
@@ -62,4 +76,17 @@ services:
       - key: SMTP_PASSWORD
         sync: false
       - key: SMTP_REMITENTE
+        sync: false
+
+      # Clave del asistente (https://console.groq.com/keys).
+      #
+      # `sync: false` es lo importante: Render la pide en el panel y la
+      # guarda cifrada, y la clave no pasa nunca por este archivo ni por
+      # el repositorio. Una clave de API en un YAML versionado esta a la
+      # vista de cualquiera que clone el proyecto, y ya no hay forma de
+      # quitarla del historial sin reescribirlo.
+      #
+      # Si se deja vacia, la API arranca igual: el chat responde que el
+      # asistente no esta disponible y el resto del sitio no se entera.
+      - key: GROQ_API_KEY
         sync: false

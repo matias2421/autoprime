@@ -43,8 +43,13 @@ CENTIMO = Decimal("0.01")
 ESTADOS_CERRADOS = ("pagada", "anulada")
 
 
-def _redondear(valor: Decimal) -> Decimal:
+def redondear_dinero(valor: Decimal) -> Decimal:
     """Al céntimo, con el medio hacia arriba, que es como se redondea dinero.
+
+    Sin guion bajo delante porque no es un detalle de este modulo: es la
+    regla de como se redondea el dinero en todo el sistema, y la usa tambien
+    el sembrador de datos de ejemplo. Copiarla alli habria creado dos reglas
+    que pueden separarse sin que nadie lo note hasta sumar una columna.
 
     Sin esto, `Decimal` arrastra todos los decimales que salgan de multiplicar
     por la tasa, y la suma de las líneas deja de cuadrar con el total por unos
@@ -131,7 +136,7 @@ async def _armar_linea(
     donde se comprueba que lo que se vende exista y esté a la venta.
     """
     cantidad = datos.get("cantidad", 1)
-    descuento = _redondear(Decimal(datos.get("descuento") or 0))
+    descuento = redondear_dinero(Decimal(datos.get("descuento") or 0))
     precio_pedido = datos.get("precio_unitario")
 
     if datos.get("producto_id"):
@@ -166,8 +171,8 @@ async def _armar_linea(
         descripcion = servicio.nombre
         referencia = {"servicio_id": servicio.id}
 
-    precio = _redondear(precio)
-    subtotal = _redondear(precio * cantidad - descuento)
+    precio = redondear_dinero(precio)
+    subtotal = redondear_dinero(precio * cantidad - descuento)
     if subtotal < 0:
         # Un descuento mayor que la línea la dejaría en negativo y restaría
         # del total de la venta, que es justo lo que un descuento no hace.
@@ -197,13 +202,13 @@ async def crear(
     ]
 
     bruto = sum((linea.subtotal for linea in lineas), Decimal(0))
-    descuento = _redondear(Decimal(datos.get("descuento") or 0))
+    descuento = redondear_dinero(Decimal(datos.get("descuento") or 0))
     if descuento > bruto:
         descuento = bruto
 
-    subtotal = _redondear(bruto - descuento)
-    impuestos = _redondear(subtotal * TASA_IVA)
-    total = _redondear(subtotal + impuestos)
+    subtotal = redondear_dinero(bruto - descuento)
+    impuestos = redondear_dinero(subtotal * TASA_IVA)
+    total = redondear_dinero(subtotal + impuestos)
 
     venta = Venta(
         # Provisional: vive lo que dure la transacción. Ver la cabecera.
@@ -325,10 +330,10 @@ async def resumen(
         "pendientes": int(pendientes or 0),
         "pagadas": pagadas,
         "anuladas": int(anuladas or 0),
-        "ingresos": _redondear(ingresos),
+        "ingresos": redondear_dinero(ingresos),
         # El promedio se mide sobre lo cobrado: dividirlo entre el total de
         # ventas contaría las anuladas y saldría un ticket más bajo del real.
         "ticket_promedio": (
-            _redondear(ingresos / pagadas) if pagadas else Decimal("0.00")
+            redondear_dinero(ingresos / pagadas) if pagadas else Decimal("0.00")
         ),
     }

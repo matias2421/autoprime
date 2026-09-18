@@ -146,7 +146,16 @@ function ModeloDetalle() {
           <p className="mt-4 max-w-xl text-base leading-relaxed text-ceniza">{vehiculo.lema}</p>
 
           <div className="mt-8 flex flex-wrap items-center gap-4">
-            <Button to="/agendar" variante="primario" tamano="lg">
+            {/*
+              El coche viaja en la dirección. Sin él, quien pulsa desde la
+              ficha de un modelo concreto aterriza en una agenda vacía y tiene
+              que volver a elegirlo, habiendo dicho ya cuál quiere.
+            */}
+            <Button
+              to={`/agendar?modelo=${vehiculo.slug}&servicio=cotizacion`}
+              variante="primario"
+              tamano="lg"
+            >
               Solicitar precio
             </Button>
             <span className="font-sans text-sm uppercase tracking-[0.14em] text-hueso">
@@ -375,7 +384,13 @@ function ModeloDetalle() {
           </p>
 
           <div className="mt-9 flex flex-wrap justify-center gap-4">
-            <Button to="/agendar" variante="primario" tamano="lg">
+            {/* Aquí el servicio es la prueba de manejo, no la cotización: el
+                texto de al lado habla de verla en persona. */}
+            <Button
+              to={`/agendar?modelo=${vehiculo.slug}&servicio=prueba`}
+              variante="primario"
+              tamano="lg"
+            >
               Agendar una cita
             </Button>
             <Button

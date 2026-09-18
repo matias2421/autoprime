@@ -31,6 +31,27 @@ const COLUMNAS = [
   },
 ];
 
+/*
+ * Ubicación de ejemplo para el enlace de mapas.
+ *
+ * Es la sede real de MANSORY en Brand (Alemania), tomada de su propia web, y
+ * está aquí para que el enlace abra un sitio que existe de verdad: la
+ * dirección de Pereira de más abajo es ficticia, como todo el concesionario.
+ *
+ * Va etiquetada como «taller de referencia» a propósito. Ponerla sin más, al
+ * lado de las redes, daría a entender que es la sede de AutoPrime, y no lo es:
+ * es la de otra empresa.
+ */
+const TALLER_REFERENCIA = {
+  nombre: "MANSORY Design & Holding GmbH",
+  direccion: "Wunsiedler Strasse 1, 95682 Brand, Alemania",
+  // El esquema `?api=1` es el oficial de Google Maps: no necesita clave y en
+  // el móvil abre la aplicación en lugar del navegador.
+  mapa:
+    "https://www.google.com/maps/search/?api=1&query=" +
+    encodeURIComponent("Wunsiedler Strasse 1, 95682 Brand, Germany"),
+};
+
 const CONTACTO = [
   { icono: "ubicacion", texto: "Av. Las Américas #45-12, Pereira" },
   { icono: "telefono", texto: "(606) 340 1290" },
@@ -71,7 +92,32 @@ function Footer() {
             </ul>
 
             <h2 className="etiqueta mt-8 text-plomo">Síguenos</h2>
-            <RedesSociales className="mt-4" titulo="AutoPrime" />
+            {/*
+              El botón del mapa comparte fila con las redes y usa el mismo
+              cuadro con borde, así que se lee como uno más del grupo sin
+              tener que duplicar estilos.
+            */}
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <RedesSociales titulo="AutoPrime" />
+
+              <a
+                href={TALLER_REFERENCIA.mapa}
+                target="_blank"
+                rel="noreferrer noopener"
+                aria-label={`Abrir en Google Maps el taller de referencia: ${TALLER_REFERENCIA.nombre}, ${TALLER_REFERENCIA.direccion}`}
+                title="Ver el taller de referencia en Google Maps"
+                className="pulsable flex h-11 w-11 items-center justify-center border border-trazo
+                           text-ceniza hover:border-accion hover:text-accion"
+              >
+                <Icono nombre="ubicacion" className="h-5 w-5" aria-hidden="true" />
+              </a>
+            </div>
+
+            <p className="mt-3 max-w-sm text-xs leading-relaxed text-plomo">
+              Taller de referencia:{" "}
+              <span className="text-ceniza">{TALLER_REFERENCIA.nombre}</span>,{" "}
+              {TALLER_REFERENCIA.direccion}.
+            </p>
           </div>
 
           {COLUMNAS.map((columna) => (

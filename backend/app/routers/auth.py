@@ -1,7 +1,8 @@
 """Autenticación: registro, login y perfil."""
 
-from fastapi import APIRouter, BackgroundTasks, status
+from fastapi import APIRouter, BackgroundTasks, Request, status
 
+from app.core import limitador
 from app.core.configuracion import configuracion
 from app.core.correo import enviar_enlace_recuperacion
 from app.core.seguridad import (
@@ -15,7 +16,7 @@ from app.core.seguridad import (
 )
 from app.crud import usuarios as crud_usuarios
 from app.dependencias import SesionDep, UsuarioActual
-from app.errores import NoAutenticado
+from app.errores import DemasiadasPeticiones, NoAutenticado
 from app.schemas.auth import (
     AvisoRecuperacion,
     Credenciales,
@@ -28,6 +29,35 @@ from app.schemas.sobres import SobreUsuario
 from app.schemas.usuario import UsuarioRegistro, UsuarioSalida
 
 router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
+
+# Intentos de entrar por minuto antes de frenar.
+#
+# Ocho deja pasar a quien se equivoca un par de veces y no se acuerda de si
+# la clave lleva mayuscula; corta en seco a quien prueba un diccionario. Sin
+# freno, el login admite miles de intentos por minuto y una clave corta cae
+# en una tarde, por muy bien cifrada que este en la base: bcrypt protege el
+# hash si alguien roba la tabla, no protege de que le pregunten al servidor
+# una y otra vez.
+INTENTOS_POR_MINUTO = 8
+
+# Mas margen aqui: es la unica manera de recuperar una cuenta y frenarla de
+# mas convierte un olvido en un problema. Pero con freno igualmente, porque
+# cada solicitud manda un correo de verdad.
+RECUPERACIONES_POR_MINUTO = 4
+
+
+def _origen(peticion: Request) -> str:
+    """De donde viene, contando con el balanceador de Render."""
+    reenviado = peticion.headers.get("x-forwarded-for")
+    if reenviado:
+        return reenviado.split(",")[0].strip()
+    return peticion.client.host if peticion.client else "desconocido"
+
+
+def _frenar(peticion: Request, llave: str, cupo: int) -> None:
+    permitido, espera = limitador.permitido(llave, cupo)
+    if not permitido:
+        raise DemasiadasPeticiones(espera)
 
 
 @router.post(
@@ -53,8 +83,22 @@ async def registrar(datos: UsuarioRegistro, sesion: SesionDep) -> Sesion:
 
 
 @router.post("/login", response_model=Sesion, summary="Iniciar sesión")
-async def iniciar_sesion(credenciales: Credenciales, sesion: SesionDep) -> Sesion:
-    """Verifica las credenciales y emite un JWT."""
+async def iniciar_sesion(
+    credenciales: Credenciales, peticion: Request, sesion: SesionDep
+) -> Sesion:
+    """Verifica las credenciales y emite un JWT.
+
+    Se cuenta por ORIGEN y ademas por CORREO, y hacen falta las dos.
+
+    Solo por origen, quien reparte los intentos entre varias direcciones
+    sigue probando contra la misma cuenta. Solo por correo, basta con ir
+    cambiando el correo de la peticion para no gastar nunca el cupo, que es
+    justo lo que hace quien prueba una clave comun contra muchas cuentas.
+    """
+    _frenar(peticion, f"login:{_origen(peticion)}", INTENTOS_POR_MINUTO)
+    _frenar(peticion, f"login:correo:{credenciales.correo.lower()}",
+            INTENTOS_POR_MINUTO)
+
     usuario = await crud_usuarios.obtener_por_correo(sesion, credenciales.correo)
 
     # Mismo mensaje si el correo no existe o si la contraseña falla: decir
@@ -101,7 +145,10 @@ async def perfil(usuario: UsuarioActual) -> SobreUsuario:
     summary="Solicitar la recuperación de la contraseña",
 )
 async def solicitar_recuperacion(
-    datos: SolicitudRecuperacion, sesion: SesionDep, tareas: BackgroundTasks
+    datos: SolicitudRecuperacion,
+    peticion: Request,
+    sesion: SesionDep,
+    tareas: BackgroundTasks,
 ) -> AvisoRecuperacion:
     """Primer paso: pedir por correo el enlace para volver a entrar.
 
@@ -118,6 +165,15 @@ async def solicitar_recuperacion(
     puede tardar segundos y quien rellenó el formulario no tiene por qué
     esperarlos.
     """
+
+    # Cada solicitud manda un correo de verdad. Sin freno, esto es un
+    # generador de correo basura con el remitente del atelier: se pide mil
+    # veces la recuperacion de una cuenta ajena y el buzon de esa persona
+    # se llena de enlaces que no pidio.
+    _frenar(peticion, f"recuperar:{_origen(peticion)}",
+            RECUPERACIONES_POR_MINUTO)
+    _frenar(peticion, f"recuperar:correo:{datos.correo.lower()}",
+            RECUPERACIONES_POR_MINUTO)
     usuario = await crud_usuarios.obtener_por_correo(sesion, datos.correo)
 
     if usuario is not None and usuario.estado == "activo":

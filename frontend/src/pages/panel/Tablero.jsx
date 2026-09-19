@@ -31,6 +31,25 @@ import {
  * de todo el negocio solo tiene sentido para quien lo gestiona.
  */
 
+/**
+ * El cambio frente al periodo anterior, listo para pintar.
+ *
+ * Devuelve `null` cuando no hay con que comparar: un «+100%» calculado sobre
+ * cero no informa de nada y ademas es falso. Vale mas no enseñar nada que
+ * enseñar un numero inventado.
+ */
+function variacion(actual, anterior) {
+  const base = Number(anterior);
+  const ahora = Number(actual);
+  if (!base || Number.isNaN(base) || Number.isNaN(ahora)) return null;
+
+  const cambio = ((ahora - base) / base) * 100;
+  return {
+    texto: `${cambio >= 0 ? "+" : ""}${cambio.toFixed(1)}%`,
+    sube: cambio >= 0,
+  };
+}
+
 const RANGOS = [
   { id: "hoy", etiqueta: "Hoy", dias: 0 },
   { id: "semana", etiqueta: "7 días", dias: 6 },
@@ -180,17 +199,29 @@ function Tablero() {
               titulo="Ventas"
               valor={numero(reporte.resumen.total)}
               icono="etiqueta"
+              variacion={variacion(
+                reporte.resumen.total,
+                reporte.comparacion?.total
+              )}
             />
             <Tarjeta
               titulo="Ingresos"
               valor={pesosCortos(reporte.resumen.ingresos)}
               icono="tarjeta"
               acento
+              variacion={variacion(
+                reporte.resumen.ingresos,
+                reporte.comparacion?.ingresos
+              )}
             />
             <Tarjeta
               titulo="Ticket promedio"
               valor={pesosCortos(reporte.resumen.ticketPromedio)}
               icono="rayo"
+              variacion={variacion(
+                reporte.resumen.ticketPromedio,
+                reporte.comparacion?.ticketPromedio
+              )}
             />
             <Tarjeta
               titulo="Por cobrar"
@@ -267,60 +298,114 @@ function Tablero() {
             </section>
           </div>
 
-          {/* -------------------- Cifras de todo el negocio ----------------- */}
+          {/* -------------------- Cifras de todo el negocio -----------------
+              En tres grupos porque responden a tres preguntas distintas: como
+              va hoy, que hay que hacer, y como esta el negocio. Todas juntas
+              y con el mismo aspecto obligaban a leer las doce para encontrar
+              la que importa.
+          */}
           {panel && (
-            <section className="mt-10">
-              <h2 className="etiqueta text-accion-claro">Estado del negocio</h2>
-              <p className="mt-2 text-sm text-ceniza">
-                Estas cifras no dependen del periodo elegido: son de ahora mismo.
-              </p>
+            <>
+              <section className="mt-10">
+                <h2 className="etiqueta text-accion-claro">Hoy</h2>
+                <p className="mt-2 text-sm text-ceniza">
+                  Comparado con el mismo momento de ayer.
+                </p>
 
-              <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <Tarjeta
-                  titulo="Ventas de hoy"
-                  valor={numero(panel.ventasHoy)}
-                  icono="etiqueta"
-                  acento
-                />
-                <Tarjeta
-                  titulo="Ingresos de hoy"
-                  valor={pesosCortos(panel.ingresosHoy)}
-                  icono="tarjeta"
-                />
-                <Tarjeta
-                  titulo="Catálogo disponible"
-                  valor={numero(panel.vehiculosDisponibles)}
-                  icono="auto"
-                />
-                <Tarjeta
-                  titulo="Vehículos vendidos"
-                  valor={numero(panel.vehiculosVendidos)}
-                  icono="check"
-                />
-                <Tarjeta
-                  titulo="Citas por atender"
-                  valor={numero(panel.citasPendientes)}
-                  icono="reloj"
-                />
-                <Tarjeta
-                  titulo="PQR abiertas"
-                  valor={numero(panel.pqrAbiertas)}
-                  icono="alerta"
-                  acento={panel.pqrAbiertas > 0}
-                />
-                <Tarjeta
-                  titulo="Facturas emitidas"
-                  valor={numero(panel.facturasEmitidas)}
-                  icono="documento"
-                />
-                <Tarjeta
-                  titulo="Usuarios activos"
-                  valor={numero(panel.usuariosActivos)}
-                  icono="usuario"
-                />
-              </div>
-            </section>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <Tarjeta
+                    titulo="Ventas de hoy"
+                    valor={numero(panel.ventasHoy)}
+                    icono="etiqueta"
+                    acento
+                    variacion={variacion(panel.ventasHoy, panel.ventasAyer)}
+                  />
+                  <Tarjeta
+                    titulo="Ingresos de hoy"
+                    valor={pesosCortos(panel.ingresosHoy)}
+                    icono="tarjeta"
+                    acento
+                    variacion={variacion(panel.ingresosHoy, panel.ingresosAyer)}
+                  />
+                </div>
+              </section>
+
+              <section className="mt-10">
+                <h2 className="etiqueta text-accion-claro">
+                  Pendiente de atender
+                </h2>
+                <p className="mt-2 text-sm text-ceniza">
+                  Lo unico de esta pantalla sobre lo que se puede actuar hoy.
+                </p>
+
+                <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <Tarjeta
+                    titulo="Ventas por cobrar"
+                    valor={numero(panel.ventasPorCobrar)}
+                    detalle={pesos(panel.importePorCobrar)}
+                    icono="reloj"
+                    acento={panel.ventasPorCobrar > 0}
+                    enlace="/panel/ventas"
+                  />
+                  <Tarjeta
+                    titulo="Sin facturar"
+                    valor={numero(panel.ventasSinFacturar)}
+                    detalle="cobradas, sin factura emitida"
+                    icono="documento"
+                    acento={panel.ventasSinFacturar > 0}
+                    enlace="/panel/ventas"
+                  />
+                  <Tarjeta
+                    titulo="Citas por atender"
+                    valor={numero(panel.citasPendientes)}
+                    icono="reloj"
+                    acento={panel.citasPendientes > 0}
+                  />
+                  <Tarjeta
+                    titulo="PQR abiertas"
+                    valor={numero(panel.pqrAbiertas)}
+                    icono="alerta"
+                    acento={panel.pqrAbiertas > 0}
+                    enlace="/panel/pqr"
+                  />
+                </div>
+              </section>
+
+              <section className="mt-10">
+                <h2 className="etiqueta text-accion-claro">Estado del negocio</h2>
+                <p className="mt-2 text-sm text-ceniza">
+                  Estas cifras no dependen del periodo elegido: son de ahora
+                  mismo.
+                </p>
+
+                <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <Tarjeta
+                    titulo="Catalogo disponible"
+                    valor={numero(panel.vehiculosDisponibles)}
+                    detalle={`${pesosCortos(panel.valorInventario)} en vitrina`}
+                    icono="auto"
+                  />
+                  <Tarjeta
+                    titulo="Vehiculos vendidos"
+                    valor={numero(panel.vehiculosVendidos)}
+                    icono="check"
+                  />
+                  <Tarjeta
+                    titulo="Facturas emitidas"
+                    valor={numero(panel.facturasEmitidas)}
+                    icono="documento"
+                    enlace="/panel/facturas"
+                  />
+                  <Tarjeta
+                    titulo="Usuarios activos"
+                    valor={numero(panel.usuariosActivos)}
+                    icono="usuario"
+                  />
+                </div>
+              </section>
+            </>
           )}
+
         </>
       )}
     </PanelLayout>

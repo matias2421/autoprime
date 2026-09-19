@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.core import asistente
+from app.core.cabeceras import CabecerasDeSeguridad
 from app.core.base_datos import comprobar_conexion, motor
 from app.core.configuracion import configuracion
 from app.errores import (
@@ -169,6 +170,12 @@ async def registrar_peticion(peticion: Request, siguiente):
 
     return respuesta
 
+
+# Cabeceras de seguridad en TODA respuesta, incluidas las de error y las de
+# archivo. Va antes que CORS en el codigo, asi que Starlette lo envuelve por
+# fuera y alcanza tambien a las respuestas que CORS genera por su cuenta,
+# como la de una peticion preflight. Ver `app/core/cabeceras.py`.
+app.add_middleware(CabecerasDeSeguridad)
 
 # El frontend de Vite corre en otro puerto, así que toda petición del
 # navegador es de origen cruzado y necesita esta autorización explícita.

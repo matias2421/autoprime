@@ -42,6 +42,20 @@ def rango_por_defecto(desde: date | None, hasta: date | None) -> tuple[date, dat
     return desde or dia, hasta or dia
 
 
+def periodo_anterior(desde: date, hasta: date) -> tuple[date, date]:
+    """El tramo de igual duración inmediatamente anterior.
+
+    De igual duración y pegado, no «el mes pasado»: comparar siete días con
+    treinta no dice nada, y dejar un hueco entre los dos tramos esconde
+    justo lo que pasó en el hueco.
+
+    Con un rango de un solo día —el reporte diario— devuelve el día
+    anterior, que es con lo que uno compara de verdad la caja del día.
+    """
+    dias = (hasta - desde).days + 1
+    return desde - timedelta(days=dias), desde - timedelta(days=1)
+
+
 def _en_rango(consulta: Select, desde: date, hasta: date) -> Select:
     return consulta.where(
         Venta.fecha >= inicio_del_dia(desde),
@@ -187,11 +201,28 @@ async def detalle_ventas(
 async def panel_administrativo(sesion: AsyncSession) -> dict:
     """Cifras de todo el negocio para el tablero del administrador.
 
-    Son seis consultas de conteo y ninguna trae filas: cada una devuelve un
-    número. Juntarlas en una sola sentencia sería una madeja de subconsultas
-    peor de leer y no más rápida.
+    Cada consulta devuelve un número y ninguna trae filas. Juntarlas en una
+    sola sentencia sería una madeja de subconsultas peor de leer y no más
+    rápida.
+
+    Lo que se añadió aquí, y por qué:
+
+    **Lo de ayer, al lado de lo de hoy.** «4 ventas hoy» no dice si el día
+    va bien. Al lado de las de ayer, sí. Era la primera pregunta que había
+    que resolver abriendo el reporte de otro periodo.
+
+    **Lo que espera una acción de alguien**: ventas por cobrar con su
+    importe, y ventas pagadas a las que todavía no se les emitió factura.
+    Un panel que solo cuenta lo que ya pasó no dice qué hay que hacer hoy, y
+    esas dos cifras son exactamente la lista de pendientes del negocio.
+
+    **El valor del inventario.** Diez vehículos disponibles puede ser mil
+    millones o veinte mil: el conteo suelto no distingue.
     """
-    inicio_hoy = inicio_del_dia(hoy())
+    dia = hoy()
+    inicio_hoy = inicio_del_dia(dia)
+    inicio_ayer = inicio_del_dia(dia - timedelta(days=1))
+    fin_ayer = fin_del_dia(dia - timedelta(days=1))
 
     usuarios = await sesion.scalar(
         select(func.count(Usuario.id)).where(Usuario.estado == "activo")
@@ -211,16 +242,50 @@ async def panel_administrativo(sesion: AsyncSession) -> dict:
     facturas_emitidas = await sesion.scalar(
         select(func.count(Factura.id)).where(Factura.estado == "emitida")
     )
+    cobrado = func.coalesce(
+        func.sum(case((Venta.estado == "pagada", Venta.total), else_=0)), 0
+    )
+
     ventas_hoy, ingresos_hoy = (
+        await sesion.execute(
+            select(func.count(Venta.id), cobrado).where(Venta.fecha >= inicio_hoy)
+        )
+    ).one()
+
+    ventas_ayer, ingresos_ayer = (
+        await sesion.execute(
+            select(func.count(Venta.id), cobrado).where(
+                Venta.fecha >= inicio_ayer, Venta.fecha <= fin_ayer
+            )
+        )
+    ).one()
+
+    # Lo que espera una accion de alguien.
+    por_cobrar, importe_por_cobrar = (
         await sesion.execute(
             select(
                 func.count(Venta.id),
-                func.coalesce(
-                    func.sum(case((Venta.estado == "pagada", Venta.total), else_=0)), 0
-                ),
-            ).where(Venta.fecha >= inicio_hoy)
+                func.coalesce(func.sum(Venta.total), 0),
+            ).where(Venta.estado == "pendiente")
         )
     ).one()
+
+    # Ventas cobradas a las que aun no se les emitio factura. La comprobacion
+    # va con un LEFT JOIN y no con un `NOT IN (SELECT ...)`: con la subconsulta,
+    # MySQL la resuelve una vez por fila de ventas.
+    sin_facturar = await sesion.scalar(
+        select(func.count(Venta.id))
+        .outerjoin(Factura, Factura.venta_id == Venta.id)
+        .where(Venta.estado == "pagada", Factura.id.is_(None))
+    )
+
+    # Cuanto vale lo que hay en vitrina. Las piezas sin precio de lista no
+    # suman: su cifra la pone un asesor y aqui seria inventarsela.
+    valor_inventario = await sesion.scalar(
+        select(func.coalesce(func.sum(Producto.precio), 0)).where(
+            Producto.estado == "disponible", Producto.precio.isnot(None)
+        )
+    )
 
     return {
         "usuarios_activos": int(usuarios or 0),
@@ -231,4 +296,10 @@ async def panel_administrativo(sesion: AsyncSession) -> dict:
         "facturas_emitidas": int(facturas_emitidas or 0),
         "ventas_hoy": int(ventas_hoy or 0),
         "ingresos_hoy": float(ingresos_hoy or 0),
+        "ventas_ayer": int(ventas_ayer or 0),
+        "ingresos_ayer": float(ingresos_ayer or 0),
+        "ventas_por_cobrar": int(por_cobrar or 0),
+        "importe_por_cobrar": float(importe_por_cobrar or 0),
+        "ventas_sin_facturar": int(sin_facturar or 0),
+        "valor_inventario": float(valor_inventario or 0),
     }

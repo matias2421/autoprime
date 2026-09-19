@@ -42,6 +42,7 @@ from httpx import ASGITransport, AsyncClient  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
+from app.core import limitador  # noqa: E402
 from app.core.base_datos import Base, obtener_sesion  # noqa: E402
 from app.core.seguridad import hashear_contrasena  # noqa: E402
 from app.main import app  # noqa: E402
@@ -58,6 +59,23 @@ CLAVES = {
     "empleado": "Empleado2026!",
     "cliente": "Cliente2026!",
 }
+
+
+@pytest.fixture(autouse=True)
+def freno_limpio():
+    """Cada prueba arranca con el contador de peticiones a cero.
+
+    El limitador vive en la memoria del proceso y las pruebas comparten
+    proceso: sin esto, el `fixture` de tokens —que inicia sesion tres veces
+    por prueba— agota el cupo del login a la tercera prueba y todo lo demas
+    falla con un 429 que no tiene nada que ver con lo que se estaba
+    midiendo.
+
+    Que haya hecho falta es, de paso, la prueba de que el freno funciona.
+    """
+    limitador.reiniciar()
+    yield
+    limitador.reiniciar()
 
 
 @pytest_asyncio.fixture

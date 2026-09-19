@@ -12,16 +12,7 @@ falle, y que el freno y los permisos hagan su trabajo.
 import httpx
 import pytest
 
-from app.core import asistente, limitador
-
-
-@pytest.fixture(autouse=True)
-def freno_limpio():
-    """El limitador vive en memoria del proceso; sin esto, una prueba que lo
-    agota deja frenada a la siguiente."""
-    limitador.reiniciar()
-    yield
-    limitador.reiniciar()
+from app.core import asistente
 
 
 class TestPqr:

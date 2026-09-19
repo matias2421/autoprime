@@ -177,9 +177,19 @@ class TestDescargas:
         )
 
         with zipfile.ZipFile(io.BytesIO(respuesta.content)) as libro:
-            hojas = [n for n in libro.namelist() if n.startswith("xl/worksheets/sheet")]
-            assert len(hojas) == 3
-            assert any("chart" in n for n in libro.namelist())
+            nombres = libro.namelist()
+
+            # Resumen, Detalle, Lineas y Ranking. Se comprueba el numero y no
+            # los nombres porque los nombres van dentro de workbook.xml, no
+            # en los del archivo.
+            hojas = [n for n in nombres if n.startswith("xl/worksheets/sheet")]
+            assert len(hojas) == 4
+
+            # Dos graficas: los ingresos en barras y el numero de ventas en
+            # linea. Son dos preguntas distintas y con una sola no se ve que
+            # un mes puede ingresar mas con menos ventas.
+            graficas = [n for n in nombres if "charts/chart" in n]
+            assert len(graficas) == 2
 
             cadenas = libro.read("xl/sharedStrings.xml").decode("utf-8")
             assert "$ " not in cadenas

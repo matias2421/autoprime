@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 import Icono from "../ui/Icono";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -35,10 +37,23 @@ function PanelLayout({ titulo, descripcion, etiqueta, acciones, children }) {
   );
 }
 
-/** Tarjeta de conteo para el resumen de cada panel. */
-function Tarjeta({ titulo, valor, icono, acento = false }) {
-  return (
-    <div className="cristal cristal-vivo reflejo alza p-5">
+/**
+ * Tarjeta de cifra para el resumen de cada panel.
+ *
+ * Tres cosas opcionales, y las tres existen por un motivo concreto:
+ *
+ * `variacion` — una cifra sola no dice si el periodo fue bueno. «$50 mil M»
+ * solo significa algo al lado de lo que se hizo antes.
+ *
+ * `detalle` — «7 ventas por cobrar» no dice cuanto dinero es eso, que es la
+ * pregunta siguiente y obligaba a ir a la tabla a sumarlas.
+ *
+ * `enlace` — una cifra que pide una accion tiene que llevar a donde se hace.
+ * Con «5 PQR abiertas» y sin enlace, hay que ir a buscar el menu.
+ */
+function Tarjeta({ titulo, valor, icono, acento = false, variacion, detalle, enlace }) {
+  const contenido = (
+    <>
       <div className="flex items-center justify-between gap-3">
         <p className="etiqueta text-plomo">{titulo}</p>
         {icono && (
@@ -48,9 +63,44 @@ function Tarjeta({ titulo, valor, icono, acento = false }) {
           />
         )}
       </div>
-      <p className="display mt-2 text-3xl text-hueso">{valor}</p>
-    </div>
+
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <p className="display text-3xl text-hueso">{valor}</p>
+        {variacion && (
+          <span
+            className={`font-sans text-xs tracking-[0.08em] ${
+              variacion.sube ? "text-exito" : "text-accion-claro"
+            }`}
+          >
+            {/* El signo va en el texto ademas del color: quien no distingue
+                el verde del azul se quedaria sin saber si sube o baja. */}
+            {variacion.texto}
+          </span>
+        )}
+      </div>
+
+      {detalle && (
+        <p className="mt-1 font-sans text-xs text-plomo">{detalle}</p>
+      )}
+    </>
   );
+
+  const clases = "cristal cristal-vivo reflejo alza block p-5";
+
+  if (enlace) {
+    return (
+      <Link
+        to={enlace}
+        className={`${clases} transition-colors hover:border-accion/40
+                    focus-visible:outline-2 focus-visible:outline-offset-2
+                    focus-visible:outline-accion-claro motion-reduce:transition-none`}
+      >
+        {contenido}
+      </Link>
+    );
+  }
+
+  return <div className={clases}>{contenido}</div>;
 }
 
 /** Mensaje de estado (cargando, error o vacio) dentro de un panel. */

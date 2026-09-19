@@ -22,6 +22,7 @@ from app.errores import DatosInvalidos
 from app.reportes.excel import reporte_ventas_excel
 from app.reportes.pdf import reporte_ventas_pdf
 from app.schemas.reporte import (
+    Comparacion,
     CorteConcepto,
     CorteEstado,
     PanelAdministrativo,
@@ -72,9 +73,22 @@ async def _armar(
     """Junta todas las piezas del reporte. Lo comparten JSON, PDF y Excel."""
     solo_mias = None if _es_personal(usuario) else usuario.id
 
+    # El tramo anterior, del mismo largo. Se pide siempre: son dos consultas
+    # de agregado sobre un indice, y tenerlo listo evita que el PDF y el
+    # Excel tengan que decidir por su cuenta si comparan o no.
+    antes_desde, antes_hasta = crud_reportes.periodo_anterior(desde, hasta)
+    anterior = await crud_ventas.resumen(sesion, solo_mias, antes_desde, antes_hasta)
+
     return {
         "desde": desde,
         "hasta": hasta,
+        "comparacion": {
+            "desde": antes_desde,
+            "hasta": antes_hasta,
+            "total": anterior["total"],
+            "ingresos": anterior["ingresos"],
+            "ticket_promedio": anterior["ticket_promedio"],
+        },
         "alcance": (
             "Todas las ventas del negocio"
             if solo_mias is None
@@ -145,6 +159,7 @@ async def ventas(
             rango=Rango(desde=desde, hasta=hasta, dias=(hasta - desde).days + 1),
             alcance=datos["alcance"],
             resumen=ResumenVentas(**datos["resumen"]),
+            comparacion=Comparacion(**datos["comparacion"]),
             por_dia=[PuntoDiario(**p) for p in datos["por_dia"]],
             por_estado=[CorteEstado(**c) for c in datos["por_estado"]],
             top_vehiculos=[CorteConcepto(**c) for c in datos["top_vehiculos"]],

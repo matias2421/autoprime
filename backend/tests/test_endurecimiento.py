@@ -207,3 +207,46 @@ class TestCabeceras:
         un problema dentro de seis meses en otro proyecto distinto."""
         respuesta = await cliente.get("/salud")
         assert "strict-transport-security" not in respuesta.headers
+
+
+class TestComprobacionDeSalud:
+    """Dos preguntas distintas, dos respuestas.
+
+    Esto existe por un fallo real: el proveedor tenía `/salud` como
+    comprobación de salud, `/salud` consulta la base, y el día que la base
+    desapareció un rato dio por FALLIDO un despliegue que no tenía nada
+    malo. Quince minutos esperando algo que no dependía del código.
+    """
+
+    async def test_vivo_no_toca_la_base(self, cliente, monkeypatch):
+        """La prueba de verdad: se rompe la conexión y `/vivo` sigue
+        respondiendo. Si consultara la base, aquí fallaría."""
+        from app.core import base_datos
+
+        async def base_caida(sesion):
+            raise RuntimeError("la base no responde")
+
+        monkeypatch.setattr(base_datos, "comprobar_conexion", base_caida)
+
+        respuesta = await cliente.get("/vivo")
+        assert respuesta.status_code == 200
+        assert respuesta.json()["ok"] is True
+
+    async def test_salud_si_la_toca(self, cliente):
+        """Y `/salud` sigue siendo el diagnóstico completo: si no mirara la
+        base, no serviría para lo que existe."""
+        respuesta = await cliente.get("/salud")
+        assert respuesta.status_code == 200
+        assert respuesta.json()["base_datos"] == "conectada"
+        assert "cifrado" in respuesta.json()
+
+    async def test_el_proveedor_apunta_a_vivo(self):
+        """El render.yaml y el código tienen que decir lo mismo. Si alguien
+        vuelve a apuntarlo a /salud, esta prueba lo dice antes de que lo
+        diga un despliegue fallido."""
+        import io
+        from pathlib import Path
+
+        raiz = Path(__file__).resolve().parent.parent.parent
+        configuracion = io.open(raiz / "render.yaml", encoding="utf-8").read()
+        assert "healthCheckPath: /vivo" in configuracion

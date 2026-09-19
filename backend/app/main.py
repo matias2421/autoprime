@@ -422,14 +422,42 @@ async def raiz():
     }
 
 
+@app.get("/vivo", tags=["Sistema"], summary="¿El proceso responde?")
+async def vivo():
+    """Lo único que comprueba es que la aplicación esté en pie.
+
+    Existe por algo que pasó: el proveedor tenía configurado `/salud` como
+    comprobación de salud, y `/salud` consulta la base. Cuando la base
+    desapareció un rato, `/salud` empezó a devolver 500, el proveedor nunca
+    obtuvo un 200 y dio por FALLIDO un despliegue que no tenía nada malo:
+    quince minutos esperando algo que no dependía del código.
+
+    Peor todavía es el caso que no llegó a darse: con la comprobación atada
+    a la base, un parpadeo de treinta segundos de la base puede hacer que el
+    proveedor reinicie o retire un servicio que funcionaba, y tumbar el
+    sitio entero por algo pasajero.
+
+    Son dos preguntas distintas y conviene tener dos respuestas:
+
+      /vivo   ¿está el proceso en pie?  -> esto lo decide el proveedor
+      /salud  ¿funciona todo, base incluida?  -> esto lo lee una persona
+
+    Por eso no toca la base. A propósito.
+    """
+    return {"ok": True, "servicio": configuracion.nombre_app}
+
+
 @app.get("/salud", tags=["Sistema"], summary="Estado del servicio")
 async def salud(sesion: SesionDep):
-    """Lo que Render consulta para saber si el servicio esta sano.
+    """Diagnóstico completo: la base responde y cómo va el cifrado.
 
-    Comprueba la conexion de verdad, no solo que el proceso responda: si la
-    base cae, el panel del proveedor lo refleja en lugar de dar el servicio
-    por bueno. Y dice como va el cifrado del enlace, que es la unica forma de
-    confirmar desde fuera que el certificado llego al despliegue.
+    Esta ruta SÍ consulta la base, y por eso puede devolver 500. Es lo que se
+    quiere de un diagnóstico —si la base no responde, hay que enterarse— pero
+    es justo lo que no se quiere de una comprobación de salud automática.
+    Para eso está `/vivo`.
+
+    El campo `cifrado` es la única forma de confirmar desde fuera que el
+    certificado llegó al despliegue.
     """
     await comprobar_conexion(sesion)
     return {

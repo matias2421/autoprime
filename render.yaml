@@ -23,10 +23,20 @@ services:
     # que Render asigna; con los valores de local no recibiría tráfico.
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
 
-    # Render consulta esta ruta para saber si el servicio está sano. Apunta a
-    # /salud, que además comprueba la conexión con la base: si la base cae, el
-    # panel lo refleja en lugar de dar el servicio por bueno.
-    healthCheckPath: /salud
+    # Render consulta esta ruta para decidir si el servicio está sano.
+    #
+    # Apunta a /vivo, que solo comprueba que el proceso responda, y NO a
+    # /salud, que consulta la base. La diferencia costó un despliegue: con
+    # /salud aquí, el día que la base desapareció un rato Render nunca
+    # obtuvo un 200 y dio por fallido un despliegue que no tenía nada malo.
+    #
+    # Y el caso peor, que no llegó a darse: con la comprobación atada a la
+    # base, un parpadeo de treinta segundos puede hacer que Render reinicie
+    # o retire un servicio que funcionaba.
+    #
+    # /salud sigue existiendo y sigue mirando la base: es el diagnóstico que
+    # lee una persona, no el que decide si el servicio está en pie.
+    healthCheckPath: /vivo
 
     envVars:
       - key: PYTHON_VERSION

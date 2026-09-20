@@ -257,10 +257,22 @@ def main() -> int:
             hoja.set_row(r, 40)
         r += 1
 
-    # Que la cabecera de la tabla se repita al imprimir; si no, a partir de
-    # la segunda pagina no se sabe que columna es cual.
+    # Que la cabecera de la tabla se repita AL IMPRIMIR; si no, a partir de
+    # la segunda pagina no se sabe que columna es cual. Esto solo afecta al
+    # papel y no cambia nada en pantalla.
     hoja.repeat_rows(fila_encabezado)
-    hoja.freeze_panes(fila_encabezado + 1, 0)
+
+    # Y NO se inmovilizan paneles, aunque apetezca.
+    #
+    # `freeze_panes` congela siempre desde la primera fila, y aqui por encima
+    # de la cabecera de la tabla hay catorce filas de instrumento: el titulo
+    # institucional, los datos del aprendiz y los indicadores. Son 424 px.
+    # En una ventana normal la rejilla mide unos 600, asi que quedaban 176 px
+    # para desplazarse... y la fila de evidencia mas alta mide 326. Como no
+    # cabe, Excel salta de fila en fila y la hoja parece trabada.
+    #
+    # Con las filas bajas habria estado bien. Con filas que llevan una
+    # captura dentro, inmovilizar es justo lo que no hay que hacer.
 
     r += 1
     hoja.merge_range(

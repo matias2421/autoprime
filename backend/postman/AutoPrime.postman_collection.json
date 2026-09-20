@@ -143,6 +143,24 @@
           "response": []
         },
         {
+          "name": "¿El proceso responde?",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/vivo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vivo"
+              ]
+            },
+            "description": "Lo único que comprueba es que la aplicación esté en pie.\n\nExiste por algo que pasó: el proveedor tenía configurado `/salud` como\ncomprobación de salud, y `/salud` consulta la base. Cuando la base\ndesapareció un rato, `/salud` empezó a devolver 500, el proveedor nunca\nobtuvo un 200 y dio por FALLIDO un despliegue que no tenía nada malo:\nquince minutos esperando algo que no dependía del código.\n\nPeor todavía es el caso que no llegó a darse: con la comprobación atada\na la base, un parpadeo de treinta segundos de la base puede hacer que el\nproveedor reinicie o retire un servicio que funcionaba, y tumbar el\nsitio entero por algo pasajero.\n\nSon dos preguntas distintas y conviene tener dos respuestas:\n\n  /vivo   ¿está el proceso en pie?  -> esto lo decide el proveedor\n  /salud  ¿funciona todo, base incluida?  -> esto lo lee una persona\n\nPor eso no toca la base. A propósito."
+          },
+          "response": []
+        },
+        {
           "name": "Estado del servicio",
           "request": {
             "method": "GET",
@@ -156,7 +174,7 @@
                 "salud"
               ]
             },
-            "description": ""
+            "description": "Diagnóstico completo: la base responde y cómo va el cifrado.\n\nEsta ruta SÍ consulta la base, y por eso puede devolver 500. Es lo que se\nquiere de un diagnóstico —si la base no responde, hay que enterarse— pero\nes justo lo que no se quiere de una comprobación de salud automática.\nPara eso está `/vivo`.\n\nEl campo `cifrado` es la única forma de confirmar desde fuera que el\ncertificado llegó al despliegue."
           },
           "response": [],
           "event": [
@@ -257,7 +275,7 @@
                 "login"
               ]
             },
-            "description": "Verifica las credenciales y emite un JWT.",
+            "description": "Verifica las credenciales y emite un JWT.\n\nSe cuenta por ORIGEN y ademas por CORREO, y hacen falta las dos.\n\nSolo por origen, quien reparte los intentos entre varias direcciones\nsigue probando contra la misma cuenta. Solo por correo, basta con ir\ncambiando el correo de la peticion para no gastar nunca el cupo, que es\njusto lo que hace quien prueba una clave comun contra muchas cuentas.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"correo\": \"{{correoAdmin}}\",\n  \"password\": \"{{claveAdmin}}\"\n}",
@@ -1459,8 +1477,16 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
-                  "pm.test(\"Trae las ocho cifras del negocio\", () => {",
-                  "    pm.expect(Object.keys(pm.response.json().panel)).to.have.lengthOf(8);",
+                  "pm.test(\"Trae las cifras del negocio, y son numeros\", () => {",
+                  "    const panel = pm.response.json().panel;",
+                  "    [",
+                  "        \"ventasHoy\", \"ingresosHoy\", \"ventasPorCobrar\", \"importePorCobrar\",",
+                  "        \"ventasSinFacturar\", \"citasPendientes\", \"pqrAbiertas\",",
+                  "        \"usuariosActivos\", \"vehiculosDisponibles\", \"facturasEmitidas\",",
+                  "    ].forEach((clave) => {",
+                  "        pm.expect(panel, clave).to.have.property(clave);",
+                  "        pm.expect(panel[clave], clave).to.be.a(\"number\");",
+                  "    });",
                   "});"
                 ]
               }

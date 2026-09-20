@@ -201,9 +201,22 @@ pm.test("Es un libro de Excel", () => {
     pm.expect(pm.response.text().slice(0, 2)).to.eql("PK");
 });""",
 
+    # No se cuentan las claves. Contarlas parece mas estricto, pero lo unico
+    # que consigue es romperse cada vez que el panel crece —que es lo que
+    # paso al pasar de ocho cifras a catorce— sin haber detectado nunca nada.
+    # Se comprueba que estan las que el panel necesita y que son numeros, que
+    # es lo que de verdad lo dejaria inservible si faltara.
     ("get", "/api/reportes/panel"): """pm.test("Responde 200", () => pm.response.to.have.status(200));
-pm.test("Trae las ocho cifras del negocio", () => {
-    pm.expect(Object.keys(pm.response.json().panel)).to.have.lengthOf(8);
+pm.test("Trae las cifras del negocio, y son numeros", () => {
+    const panel = pm.response.json().panel;
+    [
+        "ventasHoy", "ingresosHoy", "ventasPorCobrar", "importePorCobrar",
+        "ventasSinFacturar", "citasPendientes", "pqrAbiertas",
+        "usuariosActivos", "vehiculosDisponibles", "facturasEmitidas",
+    ].forEach((clave) => {
+        pm.expect(panel, clave).to.have.property(clave);
+        pm.expect(panel[clave], clave).to.be.a("number");
+    });
 });""",
 
     ("post", "/api/pqr"): """pm.test("Responde 201", () => pm.response.to.have.status(201));

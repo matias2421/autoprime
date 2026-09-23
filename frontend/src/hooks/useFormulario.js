@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 /**
  * Hook reutilizable para manejar formularios con validación en tiempo real.
@@ -22,6 +22,18 @@ export function useFormulario({
   const [tocados, setTocados] = useState({});
   const [enviando, setEnviando] = useState(false);
   const [estado, setEstado] = useState(null); // null | "exito" | "error"
+
+  // Qué campos impidieron el último envío. Hace falta guardarlo aparte de
+  // `errores` porque el aviso tiene que poder NOMBRARLOS, y decir «revisa los
+  // campos en rojo» no sirve cuando el que falla es una casilla, que no tiene
+  // borde que ponerse rojo. Eso pasaba: todo en verde y un aviso señalando un
+  // rojo que no existía en ninguna parte.
+  const [fallos, setFallos] = useState([]);
+
+  // Para llevar el foco al primer campo que falla en vez de dejar a la gente
+  // buscándolo. En un formulario largo el aviso sale abajo, junto al botón, y
+  // el campo malo puede estar fuera de la pantalla.
+  const refFormulario = useRef(null);
 
   /** Ejecuta todas las reglas sobre el conjunto de valores actual. */
   const calcularErrores = useCallback(
@@ -56,6 +68,7 @@ export function useFormulario({
       setValores((previos) => ({ ...previos, [name]: limpio }));
       setTocados((previos) => ({ ...previos, [name]: true }));
       setEstado(null);
+      setFallos([]);
     },
     [sanitizadores]
   );
@@ -86,16 +99,30 @@ export function useFormulario({
     setTocados(todos);
   }, [reglas]);
 
+  /** Lleva el foco al campo indicado, dentro de este formulario. */
+  const enfocar = useCallback((nombre) => {
+    const campo = refFormulario.current?.querySelector(`[name="${nombre}"]`);
+    if (!campo) return;
+    campo.scrollIntoView({ block: "center", behavior: "smooth" });
+    // El desplazamiento es suave, así que el foco se da después: hacerlo
+    // antes provoca que el navegador salte de golpe y anule la animación.
+    window.setTimeout(() => campo.focus({ preventScroll: true }), 180);
+  }, []);
+
   const manejarEnvio = useCallback(
     async (evento) => {
       evento?.preventDefault();
       marcarTodosTocados();
 
       // Nunca se procesa la información sin validarla antes.
-      if (Object.keys(calcularErrores(valores)).length > 0) {
+      const problemas = Object.keys(calcularErrores(valores));
+      if (problemas.length > 0) {
+        setFallos(problemas);
         setEstado("error");
+        enfocar(problemas[0]);
         return false;
       }
+      setFallos([]);
 
       setEnviando(true);
       try {
@@ -103,19 +130,23 @@ export function useFormulario({
         setEstado("exito");
         return true;
       } catch {
+        // Aquí el fallo viene del servidor, no de los campos: la lista se
+        // deja vacía para que el aviso no invente un campo culpable.
+        setFallos([]);
         setEstado("error");
         return false;
       } finally {
         setEnviando(false);
       }
     },
-    [alEnviar, calcularErrores, marcarTodosTocados, valores]
+    [alEnviar, calcularErrores, enfocar, marcarTodosTocados, valores]
   );
 
   const reiniciar = useCallback(() => {
     setValores(valoresIniciales);
     setTocados({});
     setEstado(null);
+    setFallos([]);
     setEnviando(false);
   }, [valoresIniciales]);
 
@@ -129,6 +160,8 @@ export function useFormulario({
     tocados,
     enviando,
     estado,
+    fallos,
+    refFormulario,
     esValido,
     propsCampo,
     manejarCambio,

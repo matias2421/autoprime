@@ -180,3 +180,65 @@ async def _crear_venta(cliente, como, datos, comprador="cliente"):
     )
     assert respuesta.status_code == 201, respuesta.text
     return respuesta.json()["venta"]
+
+
+class TestElConflictoDiceQueCampo:
+    """Un 409 tiene que decir CUÁL de los datos choca.
+
+    Esto existe por un fallo que se vio en el formulario de registro: el
+    servidor contestaba «ya existe una cuenta con ese correo» sin decir que
+    el problema era el correo, así que el formulario no tenía forma de saber
+    qué casilla marcar y las dejaba todas en verde junto al aviso. Quien lo
+    rellenaba veía un error y ni un solo campo señalado.
+
+    El nombre va como lo usa el cliente (`numeroDocumento`), igual que los
+    detalles de validación: si no coincide, el formulario no lo encuentra y
+    es como si no se hubiera enviado.
+    """
+
+    async def _registro(self, cliente, **cambios):
+        cuerpo = {
+            "nombre": "Prueba", "apellido": "Conflicto",
+            "tipoDocumento": "CC", "numeroDocumento": "1088777666",
+            "direccion": "Calle 1 # 2-3", "telefono": "3001112233",
+            "correo": "prueba.conflicto@example.com", "password": "Prueba2026!",
+        }
+        cuerpo.update(cambios)
+        return await cliente.post("/api/auth/registro", json=cuerpo)
+
+    async def test_el_correo_duplicado_senala_el_correo(self, cliente, datos):
+        existente = datos["usuarios"]["cliente"].correo
+
+        respuesta = await self._registro(cliente, correo=existente)
+
+        assert respuesta.status_code == 409
+        cuerpo = respuesta.json()
+        assert cuerpo["codigo"] == "correo_ya_registrado"
+        assert cuerpo["detalles"] == [
+            {"campo": "correo", "problema": cuerpo["mensaje"]}
+        ]
+
+    async def test_el_documento_duplicado_senala_el_documento(self, cliente, datos):
+        usuario = datos["usuarios"]["cliente"]
+
+        respuesta = await self._registro(
+            cliente,
+            correo="otro.correo.libre@example.com",
+            tipoDocumento=usuario.tipo_documento,
+            numeroDocumento=usuario.numero_documento,
+        )
+
+        assert respuesta.status_code == 409
+        cuerpo = respuesta.json()
+        assert cuerpo["codigo"] == "documento_ya_registrado"
+        # En camelCase, que es como lo nombra el formulario.
+        assert cuerpo["detalles"][0]["campo"] == "numeroDocumento"
+
+    def test_un_conflicto_sin_campo_no_inventa_ninguno(self):
+        """No todos los choques se pueden atribuir a una casilla —una franja
+        de cita ya tomada, por ejemplo—. Cuando no se puede, `detalles` va
+        vacío: señalar un campo al azar sería peor que no señalar ninguno."""
+        from app.errores import ConflictoDeNegocio, FranjaOcupada
+
+        assert ConflictoDeNegocio.campo is None
+        assert FranjaOcupada.campo is None

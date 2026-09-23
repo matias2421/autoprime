@@ -28,13 +28,25 @@ class RecursoNoEncontrado(ErrorDeDominio):
 
 
 class ConflictoDeNegocio(ErrorDeDominio):
-    """Los datos son válidos, pero el estado del sistema impide la operación. → 409"""
+    """Los datos son válidos, pero el estado del sistema impide la operación. → 409
+
+    `campo` dice CUÁL de los datos enviados provoca el choque, cuando se puede
+    señalar uno. No es un adorno: sin él, un formulario recibe «ya existe una
+    cuenta con ese correo» y no tiene forma de saber qué casilla marcar, así
+    que los deja todos en verde mientras enseña un error. Quien lo rellenó ve
+    un aviso y ni un solo campo señalado.
+
+    Va en el nombre que usa el cliente (`numeroDocumento`, no
+    `numero_documento`), igual que los detalles de validación.
+    """
 
     codigo = "conflicto_de_negocio"
+    campo: str | None = None
 
 
 class CorreoYaRegistrado(ConflictoDeNegocio):
     codigo = "correo_ya_registrado"
+    campo = "correo"
 
     def __init__(self, correo: str):
         super().__init__(f"Ya existe una cuenta con el correo {correo}.")
@@ -42,6 +54,7 @@ class CorreoYaRegistrado(ConflictoDeNegocio):
 
 class DocumentoYaRegistrado(ConflictoDeNegocio):
     codigo = "documento_ya_registrado"
+    campo = "numeroDocumento"
 
     def __init__(self, tipo: str, numero: str):
         super().__init__(f"Ya existe una cuenta con el documento {tipo} {numero}.")

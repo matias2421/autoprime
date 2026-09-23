@@ -54,6 +54,29 @@ const REGLAS = {
     valor ? "" : "Debes aceptar los términos para crear la cuenta.",
 };
 
+// Cómo se llama cada campo cuando hay que nombrarlo en un aviso. Tienen que
+// coincidir con la etiqueta que se ve encima del campo: si el aviso dice
+// «Teléfono» y la etiqueta pone otra cosa, no sirve de nada nombrarlo.
+const ETIQUETAS = {
+  nombre: "Nombre",
+  apellido: "Apellido",
+  tipoDocumento: "Tipo de documento",
+  numeroDocumento: "Número de documento",
+  direccion: "Dirección",
+  telefono: "Teléfono",
+  correo: "Correo electrónico",
+  password: "Contraseña",
+  confirmarPassword: "Confirmar contraseña",
+  terminos: "la aceptación de los términos",
+};
+
+/** «Teléfono y Correo electrónico», «A, B y C». */
+function enumerar(nombres) {
+  const lista = nombres.map((n) => ETIQUETAS[n] ?? n);
+  if (lista.length === 1) return lista[0];
+  return `${lista.slice(0, -1).join(", ")} y ${lista[lista.length - 1]}`;
+}
+
 const SANITIZADORES = {
   nombre: soloLetras,
   apellido: soloLetras,
@@ -130,13 +153,43 @@ function RegisterModal({ abierto, alCerrar, alRegistrar }) {
     },
   });
 
-  const { propsCampo, manejarEnvio, enviando, estado, valores, reiniciar } =
-    formulario;
+  const {
+    propsCampo,
+    manejarEnvio,
+    enviando,
+    estado,
+    valores,
+    reiniciar,
+    fallos,
+    refFormulario,
+  } = formulario;
 
   /** Combina la validacion local con la que devolvio el servidor. */
   const campo = (nombre) => {
     const props = propsCampo(nombre);
-    return { ...props, error: props.error || erroresServidor[nombre] || "" };
+    const delServidor = erroresServidor[nombre] || "";
+    return {
+      ...props,
+      error: props.error || delServidor,
+      // Un campo con un error del servidor no puede salir en verde: el visto
+      // bueno solo mira la validacion local, y decia «correcto» justo al lado
+      // del mensaje que decia que no lo era.
+      valido: props.valido && !delServidor,
+      onChange: (evento) => {
+        // Al corregir el campo se retira lo que dijo el servidor sobre el.
+        // Si no, el error se quedaba pegado hasta el siguiente envio y el
+        // campo seguia en rojo por algo ya arreglado.
+        if (delServidor) {
+          setErroresServidor((previos) => {
+            const resto = { ...previos };
+            delete resto[nombre];
+            return resto;
+          });
+          setErrorGeneral("");
+        }
+        props.onChange(evento);
+      },
+    };
   };
 
   const cerrarYReiniciar = () => {
@@ -216,7 +269,12 @@ function RegisterModal({ abierto, alCerrar, alRegistrar }) {
           </div>
         </div>
       ) : (
-        <form onSubmit={manejarEnvio} noValidate className="space-y-6">
+        <form
+          ref={refFormulario}
+          onSubmit={manejarEnvio}
+          noValidate
+          className="space-y-6"
+        >
           <div className="grid gap-6 sm:grid-cols-2">
             <Input
               label="Nombre"
@@ -320,6 +378,7 @@ function RegisterModal({ abierto, alCerrar, alRegistrar }) {
               name="terminos"
               label="Acepto los términos y el tratamiento de mis datos personales."
               checked={valores.terminos}
+              error={propsCampo("terminos").error}
               onChange={formulario.manejarCambio}
               onBlur={formulario.manejarBlur}
             />
@@ -342,7 +401,9 @@ function RegisterModal({ abierto, alCerrar, alRegistrar }) {
             >
               <Icono nombre="alerta" className="mt-0.5 h-5 w-5 shrink-0" />
               {errorGeneral ||
-                "Revisa los campos marcados en rojo antes de continuar."}
+                (fallos.length > 0
+                  ? `Falta revisar ${enumerar(fallos)}.`
+                  : "No pudimos crear la cuenta. Intenta de nuevo.")}
             </div>
           )}
 

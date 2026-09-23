@@ -223,8 +223,18 @@ def _no_encontrado(peticion: Request, error: RecursoNoEncontrado):
 
 @app.exception_handler(ConflictoDeNegocio)
 def _conflicto(peticion: Request, error: ConflictoDeNegocio):
+    # Cuando el conflicto se puede atribuir a un dato concreto, se dice cuál
+    # con la misma forma que usan los errores de validación. Así el formulario
+    # marca la casilla en vez de dejarlas todas en verde junto a un aviso.
+    detalles = (
+        [{"campo": error.campo, "problema": error.mensaje}] if error.campo else None
+    )
     return _respuesta(
-        status.HTTP_409_CONFLICT, error.codigo, error.mensaje, peticion.url.path
+        status.HTTP_409_CONFLICT,
+        error.codigo,
+        error.mensaje,
+        peticion.url.path,
+        detalles=detalles,
     )
 
 

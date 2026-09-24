@@ -48,16 +48,29 @@ PROYECTO = "AutoPrime — Plataforma web para un atelier automotriz"
 APRENDIZ = "José Matías Agudelo Bolívar"
 DOCUMENTO = "1038928023"
 FICHA = "3406211"
-PROGRAMA = "Análisis y Desarrollo de Software (ADSO)"
-CENTRO = "Centro de Servicio y Gestión Empresarial (CESGE) — Regional Antioquia"
+PROGRAMA = "Tecnólogo en Análisis y Desarrollo de Software (código 228118)"
+CENTRO = ("Centro de Servicios y Gestión Empresarial — Coordinación de "
+          "Teleinformática, SENA Regional Antioquia")
 INSTRUCTOR = "César Augusto Moreno Mena"
 REPOSITORIO = "https://github.com/matias2421/autoprime"
 API_PUBLICA = "https://autoprime-api-z9b6.onrender.com"
 
-# La solicitud del instructor deja estos dos campos en blanco. No se
-# inventan: se marcan para rellenarlos con el código oficial.
-COMPETENCIA = "[código y nombre de la competencia]"
-RAP = "[código y nombre del RAP]"
+# Los códigos salen de la Matriz de Validación Técnica del instructor, que es
+# la que los trae. La solicitud del Manual los dejaba en blanco y por eso
+# estuvieron un tiempo marcados entre corchetes: son códigos oficiales de
+# SofíaPlus y no se inventan.
+COMPETENCIA = (
+    "38367 — Estructurar propuesta técnica de servicio de TI según requisitos "
+    "técnicos y normativa<br/>"
+    "38356 — Implementar la solución de software de acuerdo con los requisitos "
+    "de operación y modelos de referencia")
+RAP = (
+    "593060-01 — Definir especificaciones técnicas del software de acuerdo con "
+    "las características del software a construir<br/>"
+    "593109-03 — Documentar el proceso de implantación de software siguiendo "
+    "estándares de calidad<br/>"
+    "593112-04 — Implantar el software de acuerdo con los niveles de servicio "
+    "establecidos con el cliente")
 
 MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
          "agosto", "septiembre", "octubre", "noviembre", "diciembre")
@@ -417,6 +430,82 @@ def arquitectura():
         ],
         [ANCHO_UTIL * 0.45, ANCHO_UTIL * 0.25, ANCHO_UTIL * 0.30]))
     bloque.append(Paragraph("Tabla 5. Tamaño del proyecto.", ESTILOS["pie"]))
+
+    # --- 4.4 ---------------------------------------------------------------
+    bloque.append(h2("4.4 Comparativa: FastAPI frente a Django REST Framework"))
+    bloque.append(p(
+        "Las dos son opciones razonables para construir esta API en Python, y "
+        "la elección no es de gustos: cambian cosas concretas del proyecto. "
+        "Lo que sigue no es una comparación general de los dos marcos, sino "
+        "lo que habría pasado <b>en AutoPrime</b> con cada uno."))
+
+    bloque.append(tabla(
+        ["Aspecto", "FastAPI (lo elegido)", "Django REST Framework"],
+        [
+            ["Validación de datos",
+             "Pydantic v2. El tipo de Python <i>es</i> la validación: "
+             "<font face='Courier'>Annotated[int, Path(ge=1)]</font> valida el "
+             "identificador de la ruta, y <font face='Courier'>Literal</font> "
+             "cierra los vocabularios (estados, tipos de documento) sin "
+             "escribir una sola comprobación.",
+             "Serializadores propios. Hay que declarar el campo en el modelo y "
+             "otra vez en el serializador. Es más ceremonia, pero deja la "
+             "validación y la representación explícitas en un solo archivo."],
+            ["Documentación",
+             "El OpenAPI sale del código, siempre al día. <b>De ahí se genera "
+             "la colección de Postman de este proyecto</b>, y eso solo es "
+             "fiable porque la especificación no puede quedarse atrás.",
+             "Necesita drf-spectacular o similar, y hay que anotar las vistas "
+             "para que el esquema salga bien. Una ruta nueva puede quedar sin "
+             "documentar sin que nada avise."],
+            ["Asincronía",
+             "ASGI nativo. Este proyecto tiene 158 funciones asíncronas, habla "
+             "con MySQL por aiomysql y con el modelo de lenguaje por httpx. "
+             "<b>Una respuesta del asistente que tarda tres segundos no "
+             "bloquea a nadie más.</b>",
+             "WSGI de origen; su soporte asíncrono existe pero es parcial y el "
+             "ORM sigue siendo síncrono. La llamada al asistente ocuparía un "
+             "proceso entero mientras espera."],
+            ["Acceso a datos",
+             "No trae ORM: hubo que elegir e integrar SQLAlchemy 2.0. Más "
+             "trabajo inicial y más decisiones que tomar.",
+             "<b>Aquí gana.</b> El ORM viene integrado, con migraciones y "
+             "panel de administración. Este proyecto crea el esquema con un "
+             "script y aún no tiene migraciones: con Django ya las tendría."],
+            ["Autenticación y permisos",
+             "Se construyeron a mano: JWT, bcrypt y dependencias que "
+             "comprueban el rol. Unas 200 líneas, pero hacen exactamente lo "
+             "que el negocio necesita y nada más.",
+             "Trae usuarios, grupos y permisos hechos. Habría ahorrado ese "
+             "trabajo a cambio de adaptarse a su modelo de usuario."],
+            ["Curva y tamaño",
+             "Se parte de casi nada y se añade lo que haga falta. El proyecto "
+             "usa 19 dependencias en total.",
+             "Trae muchas piezas resueltas de fábrica; a cambio hay que "
+             "aprender sus convenciones y cargar con lo que no se use."],
+        ],
+        [ANCHO_UTIL * 0.16, ANCHO_UTIL * 0.42, ANCHO_UTIL * 0.42]))
+    bloque.append(Paragraph(
+        "Tabla 6. Los dos marcos, aplicados a las decisiones reales de "
+        "AutoPrime.", ESTILOS["pie"]))
+
+    bloque.append(h3("Conclusión de la comparativa"))
+    bloque.append(p(
+        "<b>FastAPI fue la elección correcta para este proyecto, y por dos "
+        "motivos concretos.</b> El primero es el asistente: una llamada a un "
+        "modelo de lenguaje tarda segundos, y sin asincronía nativa cada "
+        "pregunta dejaría un proceso ocupado esperando. El segundo es que la "
+        "batería de pruebas de la API <b>se genera del OpenAPI</b>; con una "
+        "especificación que hay que mantener aparte, esa automatización no se "
+        "sostiene."))
+    bloque.append(p(
+        "Pero conviene no barrer para casa: <b>Django REST Framework habría "
+        "dado gratis dos cosas que aquí faltan</b>. Las migraciones de "
+        "esquema —que en el apartado 11.2 aparecen como recomendación "
+        "pendiente— y un panel de administración para el catálogo, que hoy se "
+        "gestiona por la API. En un proyecto con menos necesidad de "
+        "asincronía y más de administrar datos rápido, la balanza se "
+        "inclinaría al otro lado."))
     return bloque
 
 
@@ -515,7 +604,7 @@ def modelo_datos():
             [ANCHO_UTIL * 0.25, ANCHO_UTIL * 0.23, ANCHO_UTIL * 0.14,
              ANCHO_UTIL * 0.38]))
     bloque.append(Paragraph(
-        "Tabla 6. Diccionario de datos de las %d entidades."
+        "Tabla 7. Diccionario de datos de las %d entidades."
         % len(ENTIDADES), ESTILOS["pie"]))
     return bloque
 
@@ -591,7 +680,7 @@ def diseno():
         [ANCHO_UTIL * 0.08, ANCHO_UTIL * 0.42, ANCHO_UTIL * 0.31,
          ANCHO_UTIL * 0.19]))
     bloque.append(Paragraph(
-        "Tabla 7. Historias de usuario y su correspondencia con la "
+        "Tabla 8. Historias de usuario y su correspondencia con la "
         "implementación.", ESTILOS["pie"]))
 
     bloque.append(h2("6.2 Flujo de una venta, de principio a fin"))
@@ -637,7 +726,7 @@ def instalacion():
             ["Git", "cualquiera reciente", "Clona el repositorio."],
         ],
         [ANCHO_UTIL * 0.28, ANCHO_UTIL * 0.34, ANCHO_UTIL * 0.38]))
-    bloque.append(Paragraph("Tabla 8. Requisitos previos.", ESTILOS["pie"]))
+    bloque.append(Paragraph("Tabla 9. Requisitos previos.", ESTILOS["pie"]))
 
     bloque.append(h2("7.2 Instalación del backend"))
     bloque.append(codigo([
@@ -669,7 +758,7 @@ def instalacion():
         [[nombre, sentido or "—", ejemplo or "—"]
          for nombre, sentido, ejemplo in VARIABLES_ENTORNO],
         [ANCHO_UTIL * 0.28, ANCHO_UTIL * 0.47, ANCHO_UTIL * 0.25]))
-    bloque.append(Paragraph("Tabla 9. Variables de entorno del backend.",
+    bloque.append(Paragraph("Tabla 10. Variables de entorno del backend.",
                             ESTILOS["pie"]))
 
     bloque.append(h2("7.4 Preparar la base de datos"))
@@ -727,7 +816,7 @@ def instalacion():
              "cifrado, que es la única forma de confirmarlo desde fuera."],
         ],
         [ANCHO_UTIL * 0.16, ANCHO_UTIL * 0.16, ANCHO_UTIL * 0.68]))
-    bloque.append(Paragraph("Tabla 10. Despliegue de cada pieza.",
+    bloque.append(Paragraph("Tabla 11. Despliegue de cada pieza.",
                             ESTILOS["pie"]))
     bloque.append(p(
         "Un detalle del despliegue que costó un fallo real y que conviene "
@@ -769,7 +858,7 @@ def documentacion_api():
             [ANCHO_UTIL * 0.11, ANCHO_UTIL * 0.37, ANCHO_UTIL * 0.42,
              ANCHO_UTIL * 0.10]))
     bloque.append(Paragraph(
-        "Tabla 11. Catálogo completo de endpoints.", ESTILOS["pie"]))
+        "Tabla 12. Catálogo completo de endpoints.", ESTILOS["pie"]))
 
     bloque.append(h2("8.1 Formato de las respuestas"))
     bloque.append(p(
@@ -823,13 +912,21 @@ def documentacion_api():
         "",
         "{",
         '  "usuarioId": 12,',
-        '  "estado": "pendiente",',
         '  "lineas": [',
         '    { "productoId": 3, "cantidad": 1 },',
         '    { "servicioId": 2, "cantidad": 1 }',
-        "  ]",
+        '  ],',
+        '  "notas": "Entrega en el concesionario."',
         "}",
     ]))
+    bloque.append(p(
+        "El estado no se manda: toda venta nace <i>pendiente</i> y se cambia "
+        "después con <font face='Courier'>PATCH "
+        "/api/ventas/{id}/estado</font>. Es el mismo ejemplo que aparece en "
+        "<font face='Courier'>/docs</font>, y una prueba comprueba que ese "
+        "ejemplo sea una petición que el esquema acepta de verdad: uno que no "
+        "valida es peor que ninguno, porque quien lo copia recibe un 422 y se "
+        "pone a buscar el fallo en su propio código."))
     bloque.append(p("<b>Respuesta 201</b> (recortada)"))
     bloque.append(codigo([
         "{",
@@ -997,7 +1094,7 @@ def pruebas():
         ],
         [ANCHO_UTIL * 0.20, ANCHO_UTIL * 0.18, ANCHO_UTIL * 0.42,
          ANCHO_UTIL * 0.20]))
-    bloque.append(Paragraph("Tabla 12. Niveles de prueba y resultados.",
+    bloque.append(Paragraph("Tabla 13. Niveles de prueba y resultados.",
                             ESTILOS["pie"]))
 
     bloque.append(h2("10.1 Pruebas automáticas"))
@@ -1087,7 +1184,7 @@ def pruebas():
         ],
         [ANCHO_UTIL * 0.32, ANCHO_UTIL * 0.32, ANCHO_UTIL * 0.36]))
     bloque.append(Paragraph(
-        "Tabla 13. Defectos detectados por las pruebas y su corrección.",
+        "Tabla 14. Defectos detectados por las pruebas y su corrección.",
         ESTILOS["pie"]))
     return bloque
 
@@ -1165,7 +1262,7 @@ def anexos():
              "<font face='Courier'>%s/salud</font>" % API_PUBLICA],
         ],
         [ANCHO_UTIL * 0.38, ANCHO_UTIL * 0.62]))
-    bloque.append(Paragraph("Tabla 14. Enlaces del proyecto.", ESTILOS["pie"]))
+    bloque.append(Paragraph("Tabla 15. Enlaces del proyecto.", ESTILOS["pie"]))
 
     bloque.append(h2("12.2 Cuentas de demostración"))
     bloque.append(p(
@@ -1180,7 +1277,7 @@ def anexos():
             ["Cliente", "cliente@autoprime.com.co", "Cliente2026!"],
         ],
         [ANCHO_UTIL * 0.25, ANCHO_UTIL * 0.45, ANCHO_UTIL * 0.30]))
-    bloque.append(Paragraph("Tabla 15. Cuentas de acceso para la revisión.",
+    bloque.append(Paragraph("Tabla 16. Cuentas de acceso para la revisión.",
                             ESTILOS["pie"]))
 
     bloque.append(h2("12.3 Dependencias del backend"))
@@ -1190,7 +1287,7 @@ def anexos():
          for n, v in DEPENDENCIAS_BACKEND],
         [ANCHO_UTIL * 0.55, ANCHO_UTIL * 0.45]))
     bloque.append(Paragraph(
-        "Tabla 16. Dependencias de Python, con versión fija.", ESTILOS["pie"]))
+        "Tabla 17. Dependencias de Python, con versión fija.", ESTILOS["pie"]))
 
     normales, desarrollo = DEPENDENCIAS_FRONTEND
     bloque.append(h2("12.4 Dependencias del frontend"))
@@ -1201,7 +1298,7 @@ def anexos():
         + [["<font face='Courier'>%s</font>" % n, v, "Desarrollo"]
            for n, v in desarrollo],
         [ANCHO_UTIL * 0.45, ANCHO_UTIL * 0.25, ANCHO_UTIL * 0.30]))
-    bloque.append(Paragraph("Tabla 17. Dependencias de Node.", ESTILOS["pie"]))
+    bloque.append(Paragraph("Tabla 18. Dependencias de Node.", ESTILOS["pie"]))
 
     bloque.append(h2("12.5 Otras evidencias entregadas"))
     bloque += vinetas([

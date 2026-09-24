@@ -15,7 +15,7 @@ from decimal import Decimal
 
 from pydantic import Field, model_validator
 
-from app.schemas.comunes import Dinero, Esquema
+from app.schemas.comunes import con_ejemplo, Dinero, Esquema
 
 
 class LineaCrear(Esquema):
@@ -44,6 +44,13 @@ class VentaCrear(Esquema):
     `usuario_id` solo lo puede usar el personal, para registrar la venta a
     nombre de un cliente. Sin él, el comprador es quien trae el token.
     """
+
+    model_config = con_ejemplo(
+        usuarioId=12,
+        lineas=[{"productoId": 3, "cantidad": 1},
+                {"servicioId": 2, "cantidad": 1}],
+        notas="Entrega en el concesionario.",
+    )
 
     lineas: list[LineaCrear] = Field(min_length=1, max_length=20)
     usuario_id: int | None = Field(default=None, ge=1)

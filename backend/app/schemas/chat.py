@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import Field
 
-from app.schemas.comunes import Esquema
+from app.schemas.comunes import con_ejemplo, Esquema
 
 
 class MensajeCrear(Esquema):
@@ -13,6 +13,10 @@ class MensajeCrear(Esquema):
     El tope de longitud no es estético: el texto viaja al proveedor y se paga
     por lo que ocupa, así que un cuerpo sin límite es una factura sin límite.
     """
+
+    model_config = con_ejemplo(
+        contenido="¿Qué vehículos tienen disponibles?",
+    )
 
     contenido: str = Field(min_length=1, max_length=1500)
 

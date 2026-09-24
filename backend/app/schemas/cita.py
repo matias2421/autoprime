@@ -5,7 +5,7 @@ from datetime import date, datetime, time, timedelta
 from pydantic import Field, field_validator
 
 from app.core.tiempo import hoy as hoy_en_colombia
-from app.schemas.comunes import Esquema, EstadoCita
+from app.schemas.comunes import con_ejemplo, Esquema, EstadoCita
 
 # Reglas de agenda, las mismas que ya aplicaba el formulario.
 DIAS_MAXIMOS = 60
@@ -40,6 +40,12 @@ class CitaCrear(Esquema):
     El `usuario_id` NO se acepta desde fuera: sale del token. Si viniera en
     el cuerpo, cualquiera podría agendar a nombre de otra persona.
     """
+
+    model_config = con_ejemplo(
+        servicioId=2, productoId=3,
+        fecha="2026-10-15", hora="10:30",
+        notas="Prefiero la mañana.",
+    )
 
     servicio_id: int = Field(ge=1)
     producto_id: int | None = Field(default=None, ge=1)

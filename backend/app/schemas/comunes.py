@@ -37,6 +37,19 @@ class Esquema(BaseModel):
     )
 
 
+def con_ejemplo(**campos):
+    """Añade a un esquema el cuerpo de ejemplo que se ve en `/docs`.
+
+    Los ejemplos se escriben en `camelCase`, que es como viaja la API de
+    verdad: un ejemplo en `snake_case` se podría copiar de la documentación
+    y no funcionaría, que es lo contrario de para lo que sirve un ejemplo.
+
+    Pydantic FUSIONA la configuración con la de la clase padre, así que esto
+    no se lleva por delante el generador de alias de `Esquema`.
+    """
+    return ConfigDict(json_schema_extra={"example": campos})
+
+
 # --- Vocabularios del dominio (coinciden con los ENUM de MySQL) ---
 TipoDocumento = Literal["CC", "TI", "CE", "PA", "NIT"]
 EstadoCuenta = Literal["activo", "inactivo"]

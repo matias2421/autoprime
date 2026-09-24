@@ -2,13 +2,18 @@
 
 from pydantic import EmailStr, Field, model_validator
 
-from app.schemas.comunes import Contrasena, Esquema, MezclaContrasena
+from app.schemas.comunes import con_ejemplo, Contrasena, Esquema, MezclaContrasena
 
 from app.schemas.usuario import UsuarioSalida
 
 
 class Credenciales(Esquema):
     """Cuerpo de `POST /api/auth/login`."""
+
+    model_config = con_ejemplo(
+        correo="admin@autoprime.com.co",
+        password="Admin2026!",
+    )
 
     correo: EmailStr
     password: str = Field(min_length=1)

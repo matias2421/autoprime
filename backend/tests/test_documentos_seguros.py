@@ -178,3 +178,61 @@ def _datos_con(carga: str) -> dict:
         "top_servicios": [],
         "ventas": [venta],
     }
+
+
+class TestEjemplosDeLaDocumentacion:
+    """Los ejemplos de `/docs` tienen que poder copiarse y enviarse.
+
+    Un ejemplo que no valida es peor que no poner ninguno: quien lo copia de
+    la documentacion recibe un 422 y se pone a buscar el fallo en su codigo.
+    Al escribirlos ya paso: el de ProductoCrear se dejaba fuera el `slug`,
+    que es obligatorio, y esta prueba es la que lo dijo.
+    """
+
+    @staticmethod
+    def _con_ejemplo():
+        from app.schemas.auth import Credenciales
+        from app.schemas.chat import MensajeCrear
+        from app.schemas.cita import CitaCrear
+        from app.schemas.pqr import PqrCrear
+        from app.schemas.producto import ProductoCrear
+        from app.schemas.usuario import UsuarioCrear, UsuarioRegistro
+        from app.schemas.venta import VentaCrear
+
+        return [Credenciales, UsuarioRegistro, UsuarioCrear, ProductoCrear,
+                VentaCrear, PqrCrear, CitaCrear, MensajeCrear]
+
+    def test_los_esquemas_de_entrada_traen_ejemplo(self):
+        for clase in self._con_ejemplo():
+            extra = clase.model_config.get("json_schema_extra") or {}
+            assert extra.get("example"), (
+                "%s no trae cuerpo de ejemplo para /docs" % clase.__name__)
+
+    def test_cada_ejemplo_es_una_peticion_valida(self):
+        """Se valida el ejemplo contra su propio esquema."""
+        for clase in self._con_ejemplo():
+            ejemplo = clase.model_config["json_schema_extra"]["example"]
+            clase.model_validate(ejemplo)   # revienta si no vale
+
+    def test_los_ejemplos_van_en_camelCase(self):
+        """Como viaja la API de verdad.
+
+        Un ejemplo en snake_case tambien lo aceptaria el servidor
+        —`populate_by_name` lo permite—, pero no es lo que el frontend manda
+        ni lo que se ve en el resto de la documentacion.
+        """
+        for clase in self._con_ejemplo():
+            ejemplo = clase.model_config["json_schema_extra"]["example"]
+            alias = {c.alias or n for n, c in clase.model_fields.items()}
+            for campo in ejemplo:
+                assert campo in alias, (
+                    "%s.%s no coincide con ningun alias" % (clase.__name__, campo))
+
+    def test_la_especificacion_los_publica(self):
+        """Que esten en la clase no basta: tienen que llegar al OpenAPI."""
+        from app.main import app
+
+        esquemas = app.openapi()["components"]["schemas"]
+        for clase in self._con_ejemplo():
+            assert "example" in esquemas.get(clase.__name__, {}), (
+                "%s no publica su ejemplo en /docs" % clase.__name__)

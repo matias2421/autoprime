@@ -10,6 +10,7 @@ from datetime import datetime
 from pydantic import EmailStr, Field, model_validator
 
 from app.schemas.comunes import (
+    con_ejemplo,
     Contrasena,
     Esquema,
     EstadoCuenta,
@@ -41,6 +42,15 @@ class UsuarioRegistro(UsuarioBase, MezclaContrasena):
     cualquiera podría darse de alta como administrador.
     """
 
+    model_config = con_ejemplo(
+        nombre="Valentina", apellido="Restrepo Gil",
+        tipoDocumento="CC", numeroDocumento="1017445566",
+        direccion="Calle 10 # 43-21, El Poblado",
+        telefono="3011234567",
+        correo="valentina.restrepo@example.com",
+        password="Ejemplo2026!", confirmarPassword="Ejemplo2026!",
+    )
+
     password: Contrasena
     confirmar_password: str | None = None
 
@@ -54,6 +64,16 @@ class UsuarioRegistro(UsuarioBase, MezclaContrasena):
 
 class UsuarioCrear(UsuarioBase, MezclaContrasena):
     """Alta desde el panel de administración: aquí sí se elige el rol."""
+
+    model_config = con_ejemplo(
+        nombre="Valentina", apellido="Restrepo Gil",
+        tipoDocumento="CC", numeroDocumento="1017445566",
+        direccion="Calle 10 # 43-21, El Poblado",
+        telefono="3011234567",
+        correo="valentina.restrepo@example.com",
+        password="Ejemplo2026!",
+        rol="cliente", estado="activo",
+    )
 
     password: Contrasena
     rol: NombreRol = "cliente"

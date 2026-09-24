@@ -10,11 +10,18 @@ from datetime import datetime
 
 from pydantic import Field
 
-from app.schemas.comunes import Esquema, EstadoPqr, TipoPqr
+from app.schemas.comunes import con_ejemplo, Esquema, EstadoPqr, TipoPqr
 
 
 class PqrCrear(Esquema):
     """Cuerpo de `POST /api/pqr`."""
+
+    model_config = con_ejemplo(
+        tipo="reclamo",
+        asunto="Demora en la entrega del peritaje",
+        descripcion=("Agendé el peritaje para el lunes y aún no "
+                     "recibo el informe. Necesito saber cuándo estará."),
+    )
 
     tipo: TipoPqr
     asunto: str = Field(min_length=5, max_length=120)

@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import Field
 
-from app.schemas.comunes import Esquema, EstadoProducto, Familia
+from app.schemas.comunes import con_ejemplo, Esquema, EstadoProducto, Familia
 
 
 class Especificaciones(Esquema):
@@ -48,6 +48,20 @@ class ProductoBase(Esquema):
 
 
 class ProductoCrear(ProductoBase):
+
+    model_config = con_ejemplo(
+        slug="mansory-carbonado-evo",
+        marca="MANSORY", modelo="Carbonado EVO",
+        familia="edicion", base="Ferrari 488 GTB",
+        lema="El V8 que no pide permiso",
+        descripcion="Kit completo en fibra de carbono ...",
+        imagen="/modelos/carbonado-evo.webp",
+        anio=2023, kilometraje=0, precio=4800000000,
+        motor="V8 biturbo 3.9L", potencia="820 hp",
+        aceleracion="2.9 s", velocidad="340 km/h",
+        transmision="Automática de 7 marchas",
+        traccion="Trasera", estado="disponible",
+    )
     pass
 
 

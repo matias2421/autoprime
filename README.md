@@ -451,8 +451,46 @@ se puede probar igual. Los detalles están en
 **Pruebas:** `backend/pruebas_api.py` ejercita **81 casos por HTTP**
 —autenticación, registro con validaciones, CRUD de las cuatro entidades,
 control de roles (401 frente a 403), las reglas de la agenda y el flujo
-completo de recuperación—. Además hay colección de Postman con 44 peticiones
-en `backend/sql/AutoPrime.postman_collection.json`.
+completo de recuperación—. La colección de Postman de aquel avance sigue en
+`backend/sql/AutoPrime.postman_collection.json`, con 44 peticiones.
+
+> **La colección vigente es otra**: `backend/postman/`, con **69 peticiones y
+> 62 comprobaciones**. Se genera del OpenAPI de la propia API
+> (`herramientas/generar_postman.py`), así que no puede quedarse atrás cuando
+> se añade una ruta. Se ejecuta con
+> `npx newman run backend/postman/AutoPrime.postman_collection.json -e backend/postman/AutoPrime.postman_environment.json`.
+
+## FastAPI frente a Django REST Framework
+
+Las dos son opciones razonables para construir esta API en Python. La elección
+no fue de gustos: cambia cosas concretas del proyecto. Esto no es una
+comparación general de los dos marcos, sino **lo que habría pasado en
+AutoPrime** con cada uno.
+
+| Aspecto | FastAPI (lo elegido) | Django REST Framework |
+|---|---|---|
+| **Validación** | Pydantic v2: el tipo de Python *es* la validación. `Annotated[int, Path(ge=1)]` valida el identificador de la ruta y `Literal` cierra los vocabularios sin escribir una comprobación. | Serializadores propios: el campo se declara en el modelo y otra vez en el serializador. Más ceremonia, pero todo explícito en un solo archivo. |
+| **Documentación** | El OpenAPI sale del código, siempre al día. **De ahí se genera la colección de Postman de este proyecto**, y eso solo es fiable porque la especificación no puede quedarse atrás. | Necesita `drf-spectacular` y anotar las vistas. Una ruta nueva puede quedar sin documentar sin que nada avise. |
+| **Asincronía** | ASGI nativo. 158 funciones asíncronas, MySQL por `aiomysql` y el modelo de lenguaje por `httpx`. **Una respuesta del asistente que tarda tres segundos no bloquea a nadie más.** | WSGI de origen; el soporte asíncrono es parcial y el ORM sigue siendo síncrono. La llamada al asistente ocuparía un proceso entero mientras espera. |
+| **Acceso a datos** | No trae ORM: hubo que elegir e integrar SQLAlchemy 2.0. Más trabajo inicial. | **Aquí gana.** ORM integrado, con migraciones y panel de administración. Este proyecto crea el esquema con un script y aún no tiene migraciones. |
+| **Auth y permisos** | Se construyeron a mano: JWT, bcrypt y dependencias que comprueban el rol. Unas 200 líneas que hacen lo que el negocio necesita y nada más. | Trae usuarios, grupos y permisos hechos. Habría ahorrado ese trabajo a cambio de adaptarse a su modelo de usuario. |
+| **Curva y tamaño** | Se parte de casi nada y se añade lo que haga falta: 19 dependencias en total. | Muchas piezas resueltas de fábrica; hay que aprender sus convenciones y cargar con lo que no se use. |
+
+**Conclusión.** FastAPI fue la elección correcta aquí por dos motivos
+concretos. El primero es el asistente: una llamada a un modelo de lenguaje
+tarda segundos, y sin asincronía nativa cada pregunta dejaría un proceso
+ocupado esperando. El segundo es que la batería de pruebas de la API **se
+genera del OpenAPI**; con una especificación que hay que mantener aparte, esa
+automatización no se sostiene.
+
+Pero conviene no barrer para casa: **Django REST Framework habría dado gratis
+dos cosas que aquí faltan** — las migraciones de esquema y un panel de
+administración para el catálogo. En un proyecto con menos necesidad de
+asincronía y más de administrar datos rápido, la balanza se inclinaría al otro
+lado.
+
+> El análisis completo, con el detalle de cada decisión, está en el apartado
+> 4.4 del [Manual Técnico](evidencias/ManualTecnico_Ficha3406211_Agudelo_Bolivar_Jose_Matias.pdf).
 
 ## Imágenes
 
